@@ -1,5 +1,6 @@
 import re
 from typing import List, Optional, Literal, Union, Dict, Any
+from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 TIME_24H_REGEX = re.compile(r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
@@ -120,3 +121,33 @@ class SolveResponse(BaseModel):
     explanation: Optional[str] = None
     errors: Optional[List[ValidationErrorDetail]] = None
     detail: Optional[str] = None
+    history_saved: Optional[bool] = None
+    warnings: Optional[List[str]] = None
+
+
+# Phase 4 History Schemas
+
+class SolveRunHistoryItem(BaseModel):
+    id: int
+    problem_title: Optional[str] = None
+    objective: Optional[Union[str, Dict[str, Any]]] = None
+    status: str
+    created_at: str
+    task_count: int
+
+
+class HistoryListResponse(BaseModel):
+    count: int
+    runs: List[SolveRunHistoryItem] = Field(default_factory=list)
+
+
+class SolveRunDetailResponse(BaseModel):
+    id: int
+    original_text: str
+    problem_title: Optional[str] = None
+    objective: Optional[Union[str, Dict[str, Any]]] = None
+    extracted_data: Optional[Dict[str, Any]] = None
+    status: str
+    result: Optional[Dict[str, Any]] = None
+    errors: Optional[Union[List[Any], Dict[str, Any]]] = None
+    created_at: str

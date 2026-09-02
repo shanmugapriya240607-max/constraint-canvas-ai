@@ -1,14 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { fetchHealth } from './api';
-
-const OFFICE_EXAMPLE = `Tomorrow I must reach the office by 9:00 AM. I want to start my morning routine as late as possible. Waking up takes 5 minutes. After waking up, I need to get ready for 30 minutes. After getting ready, I need to eat breakfast for 20 minutes. After breakfast, I need to travel to the office for 40 minutes. Travel must finish by 9:00 AM. These tasks must happen in that order.`;
+import React, { useState, useEffect, useRef } from 'react';
+import { fetchHealth, solveProblem } from './api';
+import ProblemInput from './components/ProblemInput';
+import LoadingState from './components/LoadingState';
+import ExtractedData from './components/ExtractedData';
+import ResultTable from './components/ResultTable';
+import GanttChart from './components/GanttChart';
+import TaskTimeline from './components/TaskTimeline';
+import ErrorMessage from './components/ErrorMessage';
 
 export default function App() {
   const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [solveResult, setSolveResult] = useState(null);
+  const [error, setError] = useState(null);
+
   const [healthStatus, setHealthStatus] = useState(null);
   const [healthLoading, setHealthLoading] = useState(true);
-  const [healthError, setHealthError] = useState(null);
 
+  const textareaRef = useRef(null);
+
+  // Poll / Check health status on mount
   useEffect(() => {
     let isMounted = true;
     fetchHealth()
@@ -20,7 +32,7 @@ export default function App() {
       })
       .catch((err) => {
         if (isMounted) {
-          setHealthError(err.message || 'Unable to connect to backend');
+          setHealthStatus({ status: 'offline', database: 'disconnected', optimizer: 'unavailable' });
           setHealthLoading(false);
         }
       });
@@ -29,21 +41,64 @@ export default function App() {
     };
   }, []);
 
+  const handleFocusTextarea = () => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handleClear = () => {
     setInputText('');
+    setSolveResult(null);
+    setError(null);
   };
 
-  const handleLoadExample = () => {
-    setInputText(OFFICE_EXAMPLE);
+  const handleLoadExample = (exampleText) => {
+    setInputText(exampleText);
+    setError(null);
   };
 
-  const handleAnalyze = () => {
-    if (!inputText.trim()) return;
-    alert("Phase 1 Base Setup active! Backend API is healthy. OpenAI & Solver engines will be enabled in Phase 2.");
+  const handleAnalyze = async () => {
+    if (!inputText || !inputText.trim() || loading) return;
+
+    setLoading(true);
+    setLoadingStep(0);
+    setError(null);
+
+    // Simulate step progress while waiting for backend
+    const stepInterval = setInterval(() => {
+      setLoadingStep((prev) => (prev < 4 ? prev + 1 : prev));
+    }, 600);
+
+    try {
+      const data = await solveProblem(inputText);
+      setSolveResult(data);
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setSolveResult(null);
+      setError(err.message || 'An unexpected error occurred while solving.');
+    } finally {
+      clearInterval(stepInterval);
+      setLoading(false);
+    }
   };
+
+  const isSuccessResult =
+    solveResult && (solveResult.status === 'OPTIMAL' || solveResult.status === 'FEASIBLE');
+
+  // Fallback deterministic explanation if backend explanation is absent
+  let explanationText = solveResult?.explanation;
+  if (!explanationText && isSuccessResult && solveResult.tasks?.length > 0) {
+    const sorted = [...solveResult.tasks].sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+    const firstStart = sorted[0]?.start || '00:00';
+    const lastEnd = sorted[sorted.length - 1]?.end || '23:59';
+    explanationText = `The schedule starts at ${firstStart} and completes by ${lastEnd}. All ${solveResult.tasks.length} tasks satisfy their dependencies and deadline.`;
+  }
 
   return (
     <div className="app-container">
+      {/* Header */}
       <header className="app-header">
         <div className="header-title">
           <h1>
@@ -52,8 +107,8 @@ export default function App() {
           <p>Natural-Language Planning and Optimization</p>
         </div>
 
-        <div className="status-bar">
-          <div className="status-badge" title="ChatGPT Integration Status">
+        <div className="status-bar" aria-label="System status indicators">
+          <div className="status-badge" title="ChatGPT Extraction Status">
             <span
               className={`status-dot ${
                 healthStatus?.openai_configured ? 'active' : 'inactive'
@@ -62,16 +117,16 @@ export default function App() {
             <span>ChatGPT</span>
           </div>
 
-          <div className="status-badge" title="Validation Engine Status">
+          <div className="status-badge" title="Pydantic Validation Engine Status">
             <span
               className={`status-dot ${
                 healthStatus?.status === 'healthy' ? 'active' : 'offline'
               }`}
             ></span>
-            <span>Validation</span>
+            <span>Pydantic</span>
           </div>
 
-          <div className="status-badge" title="OR-Tools Solver Status">
+          <div className="status-badge" title="OR-Tools Solver Engine Status">
             <span
               className={`status-dot ${
                 healthStatus?.optimizer === 'available' ? 'active' : 'offline'
@@ -79,78 +134,69 @@ export default function App() {
             ></span>
             <span>OR-Tools</span>
           </div>
+
+          <div className="status-badge" title="SQLite Database Persistence Status">
+            <span
+              className={`status-dot ${
+                healthStatus?.database === 'connected' ? 'active' : 'offline'
+              }`}
+            ></span>
+            <span>SQLite</span>
+          </div>
         </div>
       </header>
 
-      <main className="input-card">
-        <div className="card-header">
-          <h2>Enter Planning Requirement</h2>
-          {healthLoading ? (
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Checking API connection...
-            </span>
-          ) : healthError ? (
-            <span style={{ fontSize: '0.85rem', color: 'var(--error)' }}>
-              Backend offline ({healthError})
-            </span>
-          ) : (
-            <span style={{ fontSize: '0.85rem', color: 'var(--success)' }}>
-              API Connected ({healthStatus?.status})
-            </span>
+      {/* Main Problem Input Section */}
+      <ProblemInput
+        value={inputText}
+        onChange={setInputText}
+        onAnalyze={handleAnalyze}
+        onClear={handleClear}
+        onLoadExample={handleLoadExample}
+        loading={loading}
+        textareaRef={textareaRef}
+      />
+
+      {/* Loading Spinner & Pipeline */}
+      {loading && <LoadingState currentStep={loadingStep} />}
+
+      {/* Error & Non-Optimal Status Messages */}
+      {!loading && (
+        <ErrorMessage
+          result={solveResult}
+          error={error}
+          onFocusTextarea={handleFocusTextarea}
+        />
+      )}
+
+      {/* Result Display Section (Only for OPTIMAL and FEASIBLE) */}
+      {!loading && isSuccessResult && (
+        <div className="results-container">
+          {/* Explanation Banner */}
+          {explanationText && (
+            <div className="explanation-banner">
+              <span className="explanation-icon">💡</span>
+              <p className="explanation-text">{explanationText}</p>
+            </div>
           )}
+
+          {/* Extracted Metrics Summary */}
+          <ExtractedData result={solveResult} />
+
+          {/* Dynamic Gantt Chart */}
+          <GanttChart tasks={solveResult.tasks} />
+
+          {/* Schedule Table */}
+          <ResultTable tasks={solveResult.tasks} />
+
+          {/* Task Execution Timeline */}
+          <TaskTimeline tasks={solveResult.tasks} />
         </div>
+      )}
 
-        <div className="textarea-wrapper">
-          <textarea
-            id="planning-text-input"
-            className="problem-textarea"
-            placeholder="Describe your schedule, deadlines, and dependencies in natural language..."
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            rows={6}
-          ></textarea>
-          <div className="textarea-footer">
-            <span>Describe timing constraints, deadlines, and dependencies.</span>
-            <span>{inputText.length} characters</span>
-          </div>
-        </div>
-
-        <div className="button-group">
-          <button
-            id="analyze-btn"
-            className="btn btn-primary"
-            disabled={!inputText.trim()}
-            onClick={handleAnalyze}
-          >
-            Analyze &amp; Optimize
-          </button>
-          <button
-            id="load-example-btn"
-            className="btn btn-outline"
-            onClick={handleLoadExample}
-          >
-            Load Office Example
-          </button>
-          <button
-            id="clear-btn"
-            className="btn btn-secondary"
-            disabled={!inputText}
-            onClick={handleClear}
-          >
-            Clear
-          </button>
-        </div>
-      </main>
-
-      <section className="phase-info-panel">
-        <h3>Phase 1 System Ready</h3>
-        <p>
-          Base frontend layout and backend infrastructure loaded successfully. CORS is enabled for <code>http://localhost:5173</code> and <code>GET /api/health</code> is online.
-        </p>
-      </section>
-
+      {/* Footer */}
       <footer className="app-footer">
-        <p>ConstraintCanvas AI — Base Infrastructure Initialized</p>
+        <p>ConstraintCanvas AI — AI-Powered Natural Language Planning &amp; CP-SAT Optimization Engine</p>
       </footer>
     </div>
   );

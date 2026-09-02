@@ -64,7 +64,7 @@ def test_solve_valid_extraction(mock_parse):
     response = client.post("/api/solve", json=payload)
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "EXTRACTED"
+    assert data["status"] in ("OPTIMAL", "FEASIBLE", "EXTRACTED")
     assert data["problem_title"] == "Morning office schedule"
     assert data["extraction_confidence"] == 0.95
     assert len(data["tasks"]) == 2

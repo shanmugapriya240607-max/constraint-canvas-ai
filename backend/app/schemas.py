@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 TIME_24H_REGEX = re.compile(r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$")
 
+
 class PlanningRequest(BaseModel):
     text: str = Field(..., description="Natural language planning requirement")
-
 
 
 class Objective(BaseModel):
@@ -26,6 +26,14 @@ class Task(BaseModel):
     resources: List[str] = Field(default_factory=list, description="Required resources, e.g. ['person']")
     is_passive: bool = Field(False, description="True if task occurs in background without blocking active resources")
     source_text: Optional[str] = Field(None, description="Original source snippet describing the task")
+
+    # Schedule & Priority fields computed in Phase 3
+    start: Optional[str] = Field(None, description="Scheduled start time in HH:MM format")
+    end: Optional[str] = Field(None, description="Scheduled end time in HH:MM format")
+    execution_level: Optional[int] = Field(None, description="Topological execution order level")
+    priority_score: Optional[int] = Field(None, description="Calculated priority score (0 to 100)")
+    priority_reason: Optional[str] = Field(None, description="Explanation of why this task received its priority")
+    is_critical: Optional[bool] = Field(None, description="True if task is on the critical path")
 
     @field_validator("id")
     @classmethod
@@ -84,24 +92,31 @@ class ExtractedProblem(BaseModel):
         return self
 
 
-class MissingInformation(BaseModel):
-    status: Literal["NEEDS_INPUT"] = "NEEDS_INPUT"
-    message: str = "More information is required before optimization."
-    questions: List[str] = Field(default_factory=list)
-    tasks: List[Task] = Field(default_factory=list)
+class ValidationErrorDetail(BaseModel):
+    code: str
+    message: str
+    task_ids: List[str] = Field(default_factory=list)
+    suggestion: Optional[str] = None
+
+
+class ValidationResult(BaseModel):
+    valid: bool
+    errors: List[ValidationErrorDetail] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
 
 
 class SolveResponse(BaseModel):
-    status: str = Field(..., description="Result status: EXTRACTED, NEEDS_INPUT, INVALID, ERROR")
+    status: str = Field(..., description="Result status: OPTIMAL, FEASIBLE, INFEASIBLE, UNKNOWN, NEEDS_INPUT, INVALID, ERROR")
     problem_title: Optional[str] = None
     objective: Optional[Union[Objective, str, Dict[str, Any]]] = None
+    extraction_confidence: Optional[float] = None
+    makespan_minutes: Optional[int] = None
     tasks: List[Task] = Field(default_factory=list)
     missing_information: List[str] = Field(default_factory=list)
     ambiguities: List[str] = Field(default_factory=list)
     assumptions: List[str] = Field(default_factory=list)
-    extraction_confidence: Optional[float] = None
     message: Optional[str] = None
     questions: Optional[List[str]] = None
     explanation: Optional[str] = None
-    errors: Optional[List[Dict[str, Any]]] = None
+    errors: Optional[List[ValidationErrorDetail]] = None
     detail: Optional[str] = None

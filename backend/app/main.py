@@ -12,6 +12,9 @@ from app.ai_parser import (
     AITimeoutError,
     AIValidationError,
 )
+from app.validator import validate_extracted_problem
+from app.priority_engine import calculate_task_priorities
+from app.solver import solve_schedule
 
 load_dotenv()
 
@@ -54,6 +57,7 @@ def health_check():
 
 @app.post("/api/solve", response_model=SolveResponse)
 def solve_planning_problem(request: PlanningRequest):
+    # 1. Request Validation
     if not request.text or not request.text.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -61,9 +65,10 @@ def solve_planning_problem(request: PlanningRequest):
         )
 
     try:
+        # 2. ChatGPT extraction & Pydantic validation
         extracted: ExtractedProblem = parse_planning_text(request.text)
 
-        # Collect missing information & missing task durations
+        # 3. Missing information check
         missing_questions = list(extracted.missing_information)
         for task in extracted.tasks:
             if task.duration_minutes is None:
@@ -79,15 +84,39 @@ def solve_planning_problem(request: PlanningRequest):
                 tasks=extracted.tasks,
             )
 
+        # 4. Deterministic validation
+        val_result = validate_extracted_problem(extracted)
+        if not val_result.valid:
+            return SolveResponse(
+                status="INVALID",
+                message="The planning model contains invalid constraints.",
+                errors=val_result.errors,
+                tasks=[],
+            )
+
+        # 5. Priority calculation
+        prioritized_tasks = calculate_task_priorities(extracted.tasks)
+
+        # 6. OR-Tools optimization
+        solve_status, scheduled_tasks, makespan, explanation = solve_schedule(extracted, prioritized_tasks)
+
+        if solve_status == "INFEASIBLE":
+            return SolveResponse(
+                status="INFEASIBLE",
+                message="No feasible schedule found — check your constraints.",
+                explanation=explanation,
+                tasks=[],
+            )
+
+        # 7. Structured Response
         return SolveResponse(
-            status="EXTRACTED",
+            status=solve_status,
             problem_title=extracted.problem_title,
             objective=extracted.objective,
-            tasks=extracted.tasks,
-            missing_information=extracted.missing_information,
-            ambiguities=extracted.ambiguities,
-            assumptions=extracted.assumptions,
             extraction_confidence=extracted.extraction_confidence,
+            makespan_minutes=makespan,
+            tasks=scheduled_tasks,
+            explanation=explanation,
         )
 
     except AIConfigurationError as exc:

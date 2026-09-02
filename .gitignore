@@ -1,0 +1,27 @@
+# Node dependencies and build
+node_modules/
+dist/
+.vite/
+
+# Python virtual environment and bytecode
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+.env.local
+
+# SQLite database
+*.db
+backend/data/*.db
+!backend/data/.gitkeep
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

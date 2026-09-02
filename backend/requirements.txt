@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+openai
+pydantic
+ortools
+python-dotenv
+sqlalchemy
+pytest
+httpx

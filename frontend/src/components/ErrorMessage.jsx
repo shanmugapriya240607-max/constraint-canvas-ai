@@ -129,24 +129,51 @@ export default function ErrorMessage({ result, error, onFocusTextarea }) {
     );
   }
 
-  // Case 4: Network / Server error string or object
+  // Case 4: Network, HTTP 400, 422, 502, 500 or Server Exception
   if (error || (result && (result.status === 'ERROR' || result.detail))) {
-    const errorMsg =
-      typeof error === 'string'
-        ? error
-        : error?.message ||
-          result?.detail ||
-          result?.message ||
-          'An unexpected communication error occurred. Please try again.';
+    let errorTitle = 'Service Error';
+    let errorMsg = 'An unexpected communication error occurred. Please try again.';
+
+    if (typeof error === 'string') {
+      errorMsg = error;
+    } else if (error && typeof error === 'object') {
+      if (error.status === 400) {
+        errorTitle = 'Invalid Input Request (HTTP 400)';
+        errorMsg = error.message || 'Planning text is required.';
+      } else if (error.status === 422) {
+        errorTitle = 'Validation Request Error (HTTP 422)';
+        errorMsg = error.message || 'Unprocessable planning payload.';
+      } else if (error.status === 502) {
+        errorTitle = 'AI Intelligence Gateway Error (HTTP 502)';
+        errorMsg = error.message || 'The intelligence service is temporarily unavailable or returned invalid output.';
+      } else if (error.status === 500) {
+        errorTitle = 'Server Configuration Error (HTTP 500)';
+        errorMsg = error.message || 'An unexpected server error occurred. Please check server logs.';
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+    } else if (result?.detail) {
+      errorMsg = typeof result.detail === 'string' ? result.detail : 'Server error details.';
+    }
 
     return (
       <div className="error-card error-border" aria-live="polite">
         <div className="error-card-header">
           <div className="error-icon danger-icon">!</div>
           <div>
-            <h3 className="error-title danger-title">Service Error</h3>
+            <h3 className="error-title danger-title">{errorTitle}</h3>
             <p className="error-subtitle">{errorMsg}</p>
           </div>
+        </div>
+
+        <div className="error-actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onFocusTextarea}
+          >
+            Retry Input
+          </button>
         </div>
       </div>
     );

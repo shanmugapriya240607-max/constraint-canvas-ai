@@ -2,6 +2,8 @@ import React from 'react';
 
 const OFFICE_EXAMPLE = `Tomorrow I must reach the office by 9:00 AM. I want to start my morning routine as late as possible. Waking up takes 5 minutes. After waking up, I need to get ready for 30 minutes. After getting ready, I need to eat breakfast for 20 minutes. After breakfast, I need to travel to the office for 40 minutes. Travel must finish by 9:00 AM. These tasks must happen in that order.`;
 
+const STUDY_EXAMPLE = `I can start studying at 6:00 PM. Mathematics takes 45 minutes. After Mathematics, Physics takes 30 minutes. Reading takes 20 minutes and can be completed independently. Finish everything as early as possible.`;
+
 export default function ProblemInput({
   value,
   onChange,
@@ -60,16 +62,31 @@ export default function ProblemInput({
         >
           {loading ? 'Processing...' : 'Analyze & Optimize'}
         </button>
-        <button
-          id="load-example-btn"
-          type="button"
-          className="btn btn-outline"
-          disabled={loading}
-          onClick={() => onLoadExample(OFFICE_EXAMPLE)}
-          aria-label="Load Office Example text"
-        >
-          Load Office Example
-        </button>
+
+        <div className="example-buttons-group">
+          <button
+            id="load-office-example-btn"
+            type="button"
+            className="btn btn-outline"
+            disabled={loading}
+            onClick={() => onLoadExample(OFFICE_EXAMPLE)}
+            aria-label="Load Office Routine Example"
+          >
+            Office Example
+          </button>
+
+          <button
+            id="load-study-example-btn"
+            type="button"
+            className="btn btn-outline"
+            disabled={loading}
+            onClick={() => onLoadExample(STUDY_EXAMPLE)}
+            aria-label="Load Evening Study Session Example"
+          >
+            Study Session Example
+          </button>
+        </div>
+
         <button
           id="clear-btn"
           type="button"

@@ -54,6 +54,7 @@ body {
 .text-center { text-align: center; }
 .text-secondary { color: var(--text-secondary); }
 .text-muted { color: var(--text-muted); }
+.text-error { color: var(--error); }
 .small-text { font-size: 0.85rem; line-height: 1.4; }
 .code-font { font-family: var(--font-mono); font-size: 0.85rem; }
 
@@ -136,6 +137,70 @@ body {
   background-color: var(--error);
 }
 
+/* Pipeline Architecture View */
+.pipeline-view-card {
+  padding: 20px 24px;
+}
+
+.pipeline-flow-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
+.pipeline-flow-step {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 145px;
+  flex-shrink: 0;
+}
+
+.flow-step-number {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: var(--primary-violet);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.flow-step-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.flow-step-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.flow-step-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.flow-arrow {
+  color: var(--primary-violet);
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
 /* Input Section */
 .input-card {
   background-color: var(--panel-bg);
@@ -207,6 +272,12 @@ body {
   align-items: center;
 }
 
+.example-buttons-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .btn {
   min-height: 44px;
   padding: 0 20px;
@@ -220,6 +291,12 @@ body {
   gap: 8px;
   border: none;
   transition: all 0.2s ease;
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.85rem;
 }
 
 .btn:focus-visible {
@@ -979,6 +1056,89 @@ body {
 .timeline-badge-row {
   display: flex;
   gap: 8px;
+}
+
+/* Recent Plans Section */
+.history-status-msg {
+  font-size: 0.9rem;
+  padding: 12px 0;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.history-item-card {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.history-item-card:hover {
+  border-color: var(--primary-violet);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.selected-history-card {
+  border-color: var(--cyan) !important;
+  background-color: rgba(50, 217, 223, 0.05);
+}
+
+.history-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-id {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.status-pill-subtle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.optimal-badge { background-color: rgba(102, 210, 168, 0.15); color: var(--success); }
+.feasible-badge { background-color: rgba(50, 217, 223, 0.15); color: var(--cyan); }
+.warning-badge { background-color: rgba(255, 190, 92, 0.15); color: var(--warning); }
+.danger-badge { background-color: rgba(255, 102, 127, 0.15); color: var(--error); }
+
+.history-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.history-card-details {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.history-detail-item {
+  background-color: var(--panel-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* Footer */

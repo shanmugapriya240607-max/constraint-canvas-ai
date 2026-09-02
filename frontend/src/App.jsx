@@ -7,6 +7,8 @@ import ResultTable from './components/ResultTable';
 import GanttChart from './components/GanttChart';
 import TaskTimeline from './components/TaskTimeline';
 import ErrorMessage from './components/ErrorMessage';
+import PipelineView from './components/PipelineView';
+import RecentPlans from './components/RecentPlans';
 
 export default function App() {
   const [inputText, setInputText] = useState('');
@@ -14,6 +16,7 @@ export default function App() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [solveResult, setSolveResult] = useState(null);
   const [error, setError] = useState(null);
+  const [historyTrigger, setHistoryTrigger] = useState(0);
 
   const [healthStatus, setHealthStatus] = useState(null);
   const [healthLoading, setHealthLoading] = useState(true);
@@ -59,6 +62,19 @@ export default function App() {
     setError(null);
   };
 
+  const handleSelectHistoryRun = (savedResult, originalText) => {
+    setSolveResult(savedResult);
+    if (originalText) {
+      setInputText(originalText);
+    }
+    setError(null);
+    // Smooth scroll to results
+    const el = document.getElementById('results-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const handleAnalyze = async () => {
     if (!inputText || !inputText.trim() || loading) return;
 
@@ -74,10 +90,12 @@ export default function App() {
     try {
       const data = await solveProblem(inputText);
       setSolveResult(data);
+      // Trigger history list refresh after successful solve
+      setHistoryTrigger((prev) => prev + 1);
     } catch (err) {
       console.error('Analysis failed:', err);
       setSolveResult(null);
-      setError(err.message || 'An unexpected error occurred while solving.');
+      setError(err);
     } finally {
       clearInterval(stepInterval);
       setLoading(false);
@@ -104,7 +122,7 @@ export default function App() {
           <h1>
             ConstraintCanvas <span className="logo-accent">AI</span>
           </h1>
-          <p>Natural-Language Planning and Optimization</p>
+          <p>Natural-Language Planning and Optimization Engine</p>
         </div>
 
         <div className="status-bar" aria-label="System status indicators">
@@ -146,6 +164,9 @@ export default function App() {
         </div>
       </header>
 
+      {/* Processing Pipeline Architecture View */}
+      <PipelineView />
+
       {/* Main Problem Input Section */}
       <ProblemInput
         value={inputText}
@@ -171,7 +192,7 @@ export default function App() {
 
       {/* Result Display Section (Only for OPTIMAL and FEASIBLE) */}
       {!loading && isSuccessResult && (
-        <div className="results-container">
+        <div className="results-container" id="results-section">
           {/* Explanation Banner */}
           {explanationText && (
             <div className="explanation-banner">
@@ -194,9 +215,15 @@ export default function App() {
         </div>
       )}
 
+      {/* Recent Plans (SQLite History) */}
+      <RecentPlans
+        onSelectRun={handleSelectHistoryRun}
+        refreshTrigger={historyTrigger}
+      />
+
       {/* Footer */}
       <footer className="app-footer">
-        <p>ConstraintCanvas AI — AI-Powered Natural Language Planning &amp; CP-SAT Optimization Engine</p>
+        <p>ConstraintCanvas AI — Full-Stack Natural Language Planning &amp; CP-SAT Optimization Prototype</p>
       </footer>
     </div>
   );

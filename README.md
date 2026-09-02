@@ -117,14 +117,19 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Edit `backend/.env` to configure your OpenAI API Key:
+Edit `backend/.env` to configure parser mode and API settings:
 
 ```env
+# Parser Mode: 'offline' (deterministic NLP fallback for hackathon demo) or 'openai'
+PARSER_MODE=offline
+
 OPENAI_API_KEY=your_actual_openai_api_key_here
 OPENAI_MODEL=gpt-4o-mini
 DATABASE_URL=sqlite:///./data/constraint_canvas.db
 FRONTEND_ORIGIN=http://localhost:5173
 ```
+
+> **Emergency Offline Demo Mode**: When `PARSER_MODE=offline` is set (or if OpenAI API quota is exhausted), ConstraintCanvas AI transparently switches to deterministic natural-language rule-based parsing (`parser_mode="OFFLINE_RULES"`). The system extracts tasks, converts hours to minutes, parses deadlines (`9:00 AM` -> `09:00`, `6:00 PM` -> `18:00`), and determines dependencies (`A before B`, `B after A`, `A then B`) without making external API calls. All extracted tasks still pass through Pydantic validation, deterministic constraint checks, topological priority scoring, OR-Tools CP-SAT optimization, and SQLite persistence.
 
 > **Security Note**: Never commit `backend/.env` or exposure of real API keys to version control. `.env` and `*.db` are strictly ignored by `.gitignore`.
 

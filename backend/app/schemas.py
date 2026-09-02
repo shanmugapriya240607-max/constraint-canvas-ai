@@ -75,6 +75,7 @@ class ExtractedProblem(BaseModel):
     ambiguities: List[str] = Field(default_factory=list, description="Ambiguous phrases or constraints noted")
     assumptions: List[str] = Field(default_factory=list, description="Default assumptions made during extraction")
     extraction_confidence: float = Field(..., description="Extraction confidence score between 0.0 and 1.0")
+    parser_mode: Optional[str] = Field("OPENAI", description="Parser engine mode: OPENAI or OFFLINE_RULES")
 
     @field_validator("extraction_confidence")
     @classmethod
@@ -123,6 +124,8 @@ class SolveResponse(BaseModel):
     detail: Optional[str] = None
     history_saved: Optional[bool] = None
     warnings: Optional[List[str]] = None
+    parser_mode: Optional[str] = Field("OPENAI", description="Parser engine mode: OPENAI or OFFLINE_RULES")
+
 
 
 # Phase 4 History Schemas

@@ -18,6 +18,8 @@ export default function ExtractedData({ result }) {
 
   const criticalCount = tasks.filter((t) => t.is_critical).length;
 
+  const isOffline = result.parser_mode === 'OFFLINE_RULES';
+
   // Find overall start and end
   let overallStart = '—';
   let overallEnd = '—';
@@ -41,8 +43,18 @@ export default function ExtractedData({ result }) {
           <span className={`status-pill ${result.status.toLowerCase()}`}>
             {result.status === 'OPTIMAL' ? 'Optimal Solution' : 'Feasible Solution'}
           </span>
+          <span className="status-pill mode-badge">
+            {isOffline ? 'Parser: Offline Rules' : 'Parser: OpenAI'}
+          </span>
         </div>
       </div>
+
+      {isOffline && (
+        <div className="offline-demo-banner">
+          <span className="offline-icon">⚡</span>
+          <span>Offline demo mode active — deterministic natural-language parsing</span>
+        </div>
+      )}
 
       <div className="metrics-grid">
         <div className="metric-box">

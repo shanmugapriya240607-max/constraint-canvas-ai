@@ -126,13 +126,13 @@ export default function App() {
         </div>
 
         <div className="status-bar" aria-label="System status indicators">
-          <div className="status-badge" title="ChatGPT Extraction Status">
+          <div className="status-badge" title="Natural Language Parser Status">
             <span
               className={`status-dot ${
-                healthStatus?.openai_configured ? 'active' : 'inactive'
+                healthStatus?.status === 'healthy' ? 'active' : 'offline'
               }`}
             ></span>
-            <span>ChatGPT</span>
+            <span>Language Parser</span>
           </div>
 
           <div className="status-badge" title="Pydantic Validation Engine Status">

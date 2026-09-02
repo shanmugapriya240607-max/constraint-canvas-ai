@@ -582,6 +582,13 @@ body {
   margin-top: 2px;
 }
 
+.summary-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .status-pill {
   padding: 6px 14px;
   border-radius: 20px;
@@ -599,6 +606,25 @@ body {
   background-color: rgba(50, 217, 223, 0.15);
   color: var(--cyan);
   border: 1px solid var(--cyan);
+}
+
+.status-pill.mode-badge {
+  background-color: var(--input-bg);
+  color: var(--primary-violet);
+  border: 1px solid var(--primary-violet);
+}
+
+.offline-demo-banner {
+  background-color: rgba(50, 217, 223, 0.08);
+  border: 1px solid var(--cyan);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: var(--cyan);
+  font-weight: 500;
 }
 
 .metrics-grid {

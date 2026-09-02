@@ -130,6 +130,7 @@ def solve_planning_problem(request: PlanningRequest, db: Session = Depends(get_d
                 message="More information is required before optimization.",
                 questions=missing_questions,
                 tasks=extracted.tasks,
+                parser_mode=extracted.parser_mode or "OFFLINE_RULES",
             )
             _persist_run(db, request.text, extracted, "NEEDS_INPUT", solve_res)
             return solve_res
@@ -142,6 +143,7 @@ def solve_planning_problem(request: PlanningRequest, db: Session = Depends(get_d
                 message="The planning model contains invalid constraints.",
                 errors=val_result.errors,
                 tasks=[],
+                parser_mode=extracted.parser_mode or "OFFLINE_RULES",
             )
             _persist_run(db, request.text, extracted, "INVALID", solve_res)
             return solve_res
@@ -158,6 +160,7 @@ def solve_planning_problem(request: PlanningRequest, db: Session = Depends(get_d
                 message="No feasible schedule found — check your constraints.",
                 explanation=explanation,
                 tasks=[],
+                parser_mode=extracted.parser_mode or "OFFLINE_RULES",
             )
             _persist_run(db, request.text, extracted, "INFEASIBLE", solve_res)
             return solve_res
@@ -171,6 +174,7 @@ def solve_planning_problem(request: PlanningRequest, db: Session = Depends(get_d
             makespan_minutes=makespan,
             tasks=scheduled_tasks,
             explanation=explanation,
+            parser_mode=extracted.parser_mode or "OFFLINE_RULES",
         )
         _persist_run(db, request.text, extracted, solve_status, solve_res)
         return solve_res

@@ -1,8 +1,8 @@
 import React from 'react';
 
-const OFFICE_EXAMPLE = `Tomorrow I must reach the office by 9:00 AM. I want to start my morning routine as late as possible. Waking up takes 5 minutes. After waking up, I need to get ready for 30 minutes. After getting ready, I need to eat breakfast for 20 minutes. After breakfast, I need to travel to the office for 40 minutes. Travel must finish by 9:00 AM. These tasks must happen in that order.`;
+const OFFICE_EXAMPLE = `Tomorrow I must reach the office by 9:00 AM. Waking up takes 10 minutes, getting ready takes 30 minutes, eating breakfast takes 20 minutes, and travelling to the office takes 40 minutes. Waking up must finish before getting ready, getting ready must finish before breakfast, and breakfast must finish before travelling to the office.`;
 
-const STUDY_EXAMPLE = `I can start studying at 6:00 PM. Mathematics takes 45 minutes. After Mathematics, Physics takes 30 minutes. Reading takes 20 minutes and can be completed independently. Finish everything as early as possible.`;
+const STUDY_EXAMPLE = `I must submit my assignment before 6:00 PM. Research takes 45 minutes, writing takes 90 minutes, proofreading takes 20 minutes, and submission takes 5 minutes. Research must finish before writing, writing must finish before proofreading, and proofreading must finish before submission.`;
 
 export default function ProblemInput({
   value,

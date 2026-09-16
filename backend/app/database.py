@@ -17,7 +17,7 @@ class Base(DeclarativeBase):
 
 def build_engine(database_url: str) -> Engine:
     url = make_url(database_url)
-    options = {"pool_pre_ping": True}
+    options = {"pool_pre_ping": True, "hide_parameters": True}
     if url.get_backend_name() == "sqlite":
         options["connect_args"] = {"check_same_thread": False, "timeout": 30}
         if url.database in (None, "", ":memory:"):

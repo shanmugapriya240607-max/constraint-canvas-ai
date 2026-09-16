@@ -1,4 +1,4 @@
-"""Phase 1 persistence models. Authentication is not implemented yet."""
+"""Persistence models shared by the API foundation and authentication."""
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, String, false, func

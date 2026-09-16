@@ -74,8 +74,8 @@ def test_cors_rejects_unconfigured_origin(client):
     assert "access-control-allow-origin" not in response.headers
 
 
-def test_api_metadata_and_phase_one_scope(client):
+def test_api_metadata_and_implemented_scope(client):
     schema = client.get("/openapi.json").json()
     assert schema["info"]["title"] == "ConstraintCanvas AI"
     assert schema["info"]["version"] == "2.0.0"
-    assert set(schema["paths"]) == {"/", "/api/health"}
+    assert set(schema["paths"]) == {"/", "/api/health", "/api/auth/register", "/api/auth/login", "/api/auth/me"}

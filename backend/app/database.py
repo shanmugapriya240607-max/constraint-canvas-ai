@@ -1,53 +1,54 @@
-import os
+"""SQLAlchemy engine, session dependency, and explicit schema initialization."""
+from collections.abc import Generator
 from pathlib import Path
-from datetime import datetime, timezone
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, func
-from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Derive directory path relative to this database.py file
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+from fastapi import Request
+from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
-DEFAULT_DB_FILE = DATA_DIR / "constraint_canvas.db"
-DEFAULT_DB_URL = f"sqlite:///{DEFAULT_DB_FILE.as_posix()}"
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL or DATABASE_URL.strip() == "":
-    DATABASE_URL = DEFAULT_DB_URL
-
-# For SQLite, check_same_thread=False is required for FastAPI multithreaded requests
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+from app.config import BACKEND_DIR, settings
 
 
-class SolveRun(Base):
-    __tablename__ = "solve_runs"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    original_text = Column(Text, nullable=False)
-    problem_title = Column(String(255), nullable=True)
-    objective = Column(Text, nullable=True)
-    extracted_json = Column(Text, nullable=True)
-    status = Column(String(50), nullable=False)
-    result_json = Column(Text, nullable=True)
-    error_json = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now(), nullable=False)
+class Base(DeclarativeBase):
+    pass
 
 
-def init_db(custom_engine=None):
-    target_engine = custom_engine or engine
-    Base.metadata.create_all(bind=target_engine)
+def build_engine(database_url: str) -> Engine:
+    url = make_url(database_url)
+    options = {"pool_pre_ping": True}
+    if url.get_backend_name() == "sqlite":
+        options["connect_args"] = {"check_same_thread": False, "timeout": 30}
+        if url.database in (None, "", ":memory:"):
+            options["poolclass"] = StaticPool
+        elif not Path(url.database).is_absolute():
+            url = url.set(database=str((BACKEND_DIR / url.database).resolve()))
+    db_engine = create_engine(url, **options)
+    if url.get_backend_name() == "sqlite":
+        @event.listens_for(db_engine, "connect")
+        def configure_sqlite(connection, _record):
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+    return db_engine
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+engine = build_engine(settings.database_url)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+def init_db(db_engine: Engine = engine) -> None:
+    # Register tables before creating metadata; never drop or migrate existing data.
+    from app.models import User  # noqa: F401
+
+    if db_engine.dialect.name == "sqlite":
+        database = db_engine.url.database
+        if database and database != ":memory:":
+            Path(database).parent.mkdir(parents=True, exist_ok=True)
+    Base.metadata.create_all(bind=db_engine)
+
+
+def get_db(request: Request) -> Generator[Session, None, None]:
+    with request.app.state.session_factory() as session:
+        yield session

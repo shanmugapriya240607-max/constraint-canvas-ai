@@ -1,0 +1,1 @@
+"""ConstraintCanvas AI foundation package."""

@@ -21,7 +21,11 @@ from app.services.planning import (
 )
 from app.schemas.analysis import PlanAnalysisResponse
 from app.services.analysis_engine import analyze_plan
-from app.schemas.whatif import WhatIfRequest, WhatIfResponse, CompareScenariosRequest, ScenarioComparisonResponse
+from app.schemas.whatif import (
+    WhatIfRequest, WhatIfResponse, CompareScenariosRequest, ScenarioComparisonResponse
+)
+from app.schemas.memory import ContextRouterResponse, ContextApplyRequest
+from app.services import memory_engine
 from app.services.whatif_engine import simulate_what_if, compare_scenarios
 
 router = APIRouter(prefix="/api/plans", tags=["planning data"])
@@ -76,6 +80,16 @@ def run_what_if_simulation(request: WhatIfRequest, plan: OwnedPlan, db: Database
 @router.post("/{plan_id}/compare-scenarios", response_model=ScenarioComparisonResponse)
 def compare_plan_scenarios(request: CompareScenariosRequest, plan: OwnedPlan, db: Database):
     return compare_scenarios(db, plan, request)
+
+
+@router.get("/{plan_id}/context", response_model=ContextRouterResponse)
+def get_plan_context(plan: OwnedPlan, current_user: CurrentUser, db: Database):
+    return memory_engine.route_context(db, plan.id, current_user)
+
+
+@router.post("/{plan_id}/context/apply", response_model=FullPlanResponse)
+def apply_plan_context(request: ContextApplyRequest, plan: OwnedPlan, current_user: CurrentUser, db: Database):
+    return memory_engine.apply_context(db, plan.id, current_user, request)
 
 
 @router.post("/{plan_id}/resources", response_model=ResourceResponse, status_code=201)

@@ -79,4 +79,4 @@ def test_api_metadata_and_implemented_scope(client):
     assert schema["info"]["title"] == "ConstraintCanvas AI"
     assert schema["info"]["version"] == "2.0.0"
     foundation_paths = {path for path in schema["paths"] if not path.startswith("/api/plans")}
-    assert foundation_paths == {"/", "/api/health", "/api/auth/register", "/api/auth/login", "/api/auth/me"}
+    assert foundation_paths == {"/", "/api/health", "/api/auth/register", "/api/auth/login", "/api/auth/me", "/api/memory/consent", "/api/memory", "/api/memory/{memory_id}", "/api/memory/habits/detect", "/api/memory/habits", "/api/memory/habits/{habit_id}/accept", "/api/memory/habits/{habit_id}/reject"}

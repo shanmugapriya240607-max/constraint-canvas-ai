@@ -67,7 +67,7 @@ except Exception as exc:
 
 @app.get("/api/health")
 def health_check(db: Session = Depends(get_db)):
-    openai_key = os.getenv("OPENAI_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY")
 
     db_status = "disconnected"
     try:
@@ -79,7 +79,7 @@ def health_check(db: Session = Depends(get_db)):
 
     return {
         "status": "healthy",
-        "openai_configured": bool(openai_key and openai_key.strip()),
+        "openai_configured": bool(gemini_key and gemini_key.strip()),
         "database": db_status,
         "optimizer": "available",
     }
@@ -183,7 +183,7 @@ def solve_planning_problem(request: PlanningRequest, db: Session = Depends(get_d
         logger.error(f"Configuration error: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OpenAI API key is not configured.",
+            detail="Gemini API key is not configured.",
         )
 
     except AITimeoutError as exc:

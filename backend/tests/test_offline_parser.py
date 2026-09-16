@@ -26,12 +26,12 @@ HOURS_DEMO_TEXT = (
 )
 
 
-def test_offline_parser_no_openai_call_made():
-    """Verify offline parser executes cleanly without invoking OpenAI SDK or internet."""
-    with patch("openai.OpenAI") as mock_openai:
+def test_offline_parser_no_gemini_call_made():
+    """Verify offline parser executes cleanly without invoking Gemini SDK or internet."""
+    with patch("google.generativeai.GenerativeModel") as mock_gemini:
         with patch.dict("os.environ", {"PARSER_MODE": "offline"}):
             result = parse_planning_text(OFFICE_DEMO_TEXT)
-            mock_openai.assert_not_called()
+            mock_gemini.assert_not_called()
             assert result.parser_mode == "OFFLINE_RULES"
             assert len(result.tasks) == 4
             assert result.tasks[0].id == "task_1"

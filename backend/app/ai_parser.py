@@ -2,7 +2,8 @@ import os
 import re
 from typing import Optional, List, Dict, Tuple
 from dotenv import load_dotenv
-import openai
+import json
+import google.generativeai as genai
 from pydantic import ValidationError
 from app.schemas import ExtractedProblem, Task, Objective
 
@@ -45,15 +46,15 @@ class AIParserError(Exception):
     pass
 
 class AIConfigurationError(AIParserError):
-    """Raised when OpenAI API key or configuration is missing."""
+    """Raised when Gemini API key or configuration is missing."""
     pass
 
 class AITimeoutError(AIParserError):
-    """Raised when OpenAI API call times out or connection fails."""
+    """Raised when Gemini API call times out or connection fails."""
     pass
 
 class AIValidationError(AIParserError):
-    """Raised when OpenAI response fails schema validation."""
+    """Raised when Gemini response fails schema validation."""
     pass
 
 
@@ -70,40 +71,43 @@ def parse_time_to_24h(hour_str: str, min_str: Optional[str], ampm_str: Optional[
     return f"{h:02d}:{m:02d}"
 
 
-def parse_planning_text_openai(text: str, client: Optional[openai.OpenAI] = None) -> ExtractedProblem:
-    api_key = os.getenv("OPENAI_API_KEY")
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+def parse_planning_text_gemini(text: str) -> ExtractedProblem:
+    api_key = os.getenv("GEMINI_API_KEY")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-    if not client:
-        if not api_key or not api_key.strip():
-            raise AIConfigurationError("OPENAI_API_KEY is not configured.")
-        client = openai.OpenAI(api_key=api_key.strip())
+    if not api_key or not api_key.strip():
+        raise AIConfigurationError("GEMINI_API_KEY is not configured.")
+
+    genai.configure(api_key=api_key.strip())
 
     try:
-        completion = client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": text},
-            ],
-            response_format=ExtractedProblem,
-            temperature=0.0,
+        model = genai.GenerativeModel(
+            model_name=model_name,
+            system_instruction=SYSTEM_PROMPT,
         )
-        
-        parsed_result = completion.choices[0].message.parsed
-        if parsed_result is None:
+        response = model.generate_content(
+            text,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=ExtractedProblem,
+                temperature=0.0,
+            )
+        )
+
+        if not response.text:
             raise AIValidationError("The intelligence service returned empty parsing results.")
-        parsed_result.parser_mode = "OPENAI"
+
+        parsed_dict = json.loads(response.text)
+        parsed_result = ExtractedProblem(**parsed_dict)
+        parsed_result.parser_mode = "OPENAI"  # Kept as OPENAI for backward compatibility with schema (or we can change to GEMINI, but instructions said only swap API provider, not schema)
         return parsed_result
 
-    except (openai.APITimeoutError, openai.APIConnectionError) as exc:
-        raise AITimeoutError("OpenAI connection timed out or network error occurred.") from exc
-
-    except (ValidationError, openai.LengthFinishReasonError) as exc:
-        raise AIValidationError("The intelligence service returned an invalid planning structure.") from exc
-
-    except openai.OpenAIError as exc:
-        raise AIParserError(f"OpenAI API error: {str(exc)}") from exc
+    except Exception as exc:
+        if "timeout" in str(exc).lower() or "connection" in str(exc).lower():
+            raise AITimeoutError("Gemini connection timed out or network error occurred.") from exc
+        if isinstance(exc, (ValidationError, json.JSONDecodeError)):
+            raise AIValidationError("The intelligence service returned an invalid planning structure.") from exc
+        raise AIParserError(f"Gemini API error: {str(exc)}") from exc
 
 
 def parse_planning_text_offline(text: str) -> ExtractedProblem:
@@ -295,18 +299,18 @@ def parse_planning_text_offline(text: str) -> ExtractedProblem:
     )
 
 
-def parse_planning_text(text: str, client: Optional[openai.OpenAI] = None) -> ExtractedProblem:
+def parse_planning_text(text: str) -> ExtractedProblem:
     """
-    Dispatcher function selecting between OpenAI parser and Offline Deterministic parser
+    Dispatcher function selecting between Gemini parser and Offline Deterministic parser
     based on PARSER_MODE environment variable.
     """
     parser_mode_env = os.getenv("PARSER_MODE", "offline").lower().strip()
 
-    if parser_mode_env == "openai":
+    if parser_mode_env == "openai" or parser_mode_env == "gemini":
         try:
-            return parse_planning_text_openai(text, client=client)
+            return parse_planning_text_gemini(text)
         except Exception as exc:
-            # Fallback transparently to offline parser if OpenAI fails
+            # Fallback transparently to offline parser if Gemini fails
             result = parse_planning_text_offline(text)
             result.parser_mode = "OFFLINE_RULES"
             return result

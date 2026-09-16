@@ -14,7 +14,7 @@ def test_health_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert "openai_configured" in data
+    assert "openai_configured" in data # Health endpoint still returns this based on previous schema, though it's gemini now
     assert data["database"] == "connected"
     assert data["optimizer"] == "available"
 
@@ -30,7 +30,7 @@ def test_solve_empty_input():
 
 
 @patch("app.main.parse_planning_text")
-@patch.dict(os.environ, {"OPENAI_API_KEY": "mock_key"})
+@patch.dict(os.environ, {"GEMINI_API_KEY": "mock_key"})
 def test_solve_valid_extraction(mock_parse):
     mock_extracted = ExtractedProblem(
         problem_title="Morning office schedule",
@@ -72,7 +72,7 @@ def test_solve_valid_extraction(mock_parse):
 
 
 @patch("app.main.parse_planning_text")
-@patch.dict(os.environ, {"OPENAI_API_KEY": "mock_key"})
+@patch.dict(os.environ, {"GEMINI_API_KEY": "mock_key"})
 def test_solve_missing_duration(mock_parse):
     mock_extracted = ExtractedProblem(
         problem_title="Incomplete morning schedule",
@@ -100,7 +100,7 @@ def test_solve_missing_duration(mock_parse):
 
 
 @patch("app.main.parse_planning_text")
-@patch.dict(os.environ, {"OPENAI_API_KEY": "mock_key"})
+@patch.dict(os.environ, {"GEMINI_API_KEY": "mock_key"})
 def test_solve_ai_validation_error(mock_parse):
     mock_parse.side_effect = AIValidationError("Schema invalid")
 
@@ -111,8 +111,8 @@ def test_solve_ai_validation_error(mock_parse):
 
 
 @patch("app.main.parse_planning_text")
-@patch.dict(os.environ, {"OPENAI_API_KEY": "mock_key"})
-def test_solve_openai_timeout(mock_parse):
+@patch.dict(os.environ, {"GEMINI_API_KEY": "mock_key"})
+def test_solve_gemini_timeout(mock_parse):
     mock_parse.side_effect = AITimeoutError("Timeout")
 
     payload = {"text": "Some text"}

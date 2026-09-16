@@ -78,4 +78,5 @@ def test_api_metadata_and_implemented_scope(client):
     schema = client.get("/openapi.json").json()
     assert schema["info"]["title"] == "ConstraintCanvas AI"
     assert schema["info"]["version"] == "2.0.0"
-    assert set(schema["paths"]) == {"/", "/api/health", "/api/auth/register", "/api/auth/login", "/api/auth/me"}
+    foundation_paths = {path for path in schema["paths"] if not path.startswith("/api/plans")}
+    assert foundation_paths == {"/", "/api/health", "/api/auth/register", "/api/auth/login", "/api/auth/me"}

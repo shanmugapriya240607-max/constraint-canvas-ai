@@ -10,6 +10,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import sessionmaker
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.plans import router as plans_router
 from app.api.routes.health import router as health_router
 from app.config import APP_NAME, APP_VERSION, SERVICE_NAME, Settings, settings
 from app.database import SessionLocal, build_engine, engine, init_db
@@ -64,6 +65,7 @@ def create_app(config: Settings = settings, db_engine: Engine | None = None) -> 
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(plans_router)
 
     @application.get("/", response_model=RootResponse, tags=["root"])
     def root() -> RootResponse:

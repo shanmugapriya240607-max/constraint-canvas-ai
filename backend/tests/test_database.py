@@ -11,8 +11,8 @@ from app.models import User
 
 def test_lifespan_initializes_database(client, db_engine):
     inspector = inspect(db_engine)
-    assert inspector.get_table_names() == ["users"]
-    assert set(Base.metadata.tables) == {"users"}
+    assert set(inspector.get_table_names()) == set(Base.metadata.tables)
+    assert set(Base.metadata.tables) == {"users", "plans", "resources", "resource_availability", "tasks", "task_requirements", "task_dependencies", "constraint_rules"}
     assert {column["name"] for column in inspector.get_columns("users")} == {
         "id", "name", "email", "password_hash", "memory_enabled", "created_at",
     }
@@ -71,7 +71,7 @@ def test_in_memory_database_shared_with_request_threads():
     engine = build_engine("sqlite:///:memory:")
     with TestClient(create_app(db_engine=engine)) as client:
         assert client.get("/api/health").json()["database"] == "connected"
-        assert inspect(engine).get_table_names() == ["users"]
+        assert set(inspect(engine).get_table_names()) == set(Base.metadata.tables)
 
 
 def test_failed_initialization_stops_startup(tmp_path):

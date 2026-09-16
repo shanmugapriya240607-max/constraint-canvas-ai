@@ -12,7 +12,7 @@ from app.models import User
 def test_lifespan_initializes_database(client, db_engine):
     inspector = inspect(db_engine)
     assert set(inspector.get_table_names()) == set(Base.metadata.tables)
-    assert set(Base.metadata.tables) == {"users", "plans", "resources", "resource_availability", "tasks", "task_requirements", "task_dependencies", "constraint_rules"}
+    assert set(Base.metadata.tables) == {"users", "plans", "resources", "resource_availability", "tasks", "task_requirements", "task_dependencies", "constraint_rules", "solver_runs"}
     assert {column["name"] for column in inspector.get_columns("users")} == {
         "id", "name", "email", "password_hash", "memory_enabled", "created_at",
     }

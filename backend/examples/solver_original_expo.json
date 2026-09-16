@@ -1,0 +1,15 @@
+{
+  "status": "infeasible",
+  "plan_id": 3,
+  "run_id": 1,
+  "objective": null,
+  "schedule": [],
+  "metrics": {
+    "task_count": 3,
+    "scheduled_task_count": 0,
+    "planning_horizon_minutes": 540,
+    "makespan_minutes": null,
+    "solver_wall_time_ms": 1.333
+  },
+  "warnings": []
+}

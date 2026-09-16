@@ -360,7 +360,8 @@ def test_openapi_documents_every_planning_operation(client):
     schema = client.get("/openapi.json").json()
     routes = {path:operations for path,operations in schema["paths"].items() if path.startswith("/api/plans")}
     operations = [operation for path in routes.values() for method,operation in path.items() if method in {"get","post","patch","delete"}]
-    assert len(operations) == len(OPERATIONS) == 30
+    assert len(OPERATIONS) == 30
+    assert len(operations) == 33  # Phase 3 CRUD plus solve and two history operations
     assert all(operation["security"] == [{"HTTPBearer":[]}] for operation in operations)
     assert client.get("/docs").status_code == 200
 

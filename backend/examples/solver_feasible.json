@@ -1,0 +1,67 @@
+{
+  "status": "optimal",
+  "plan_id": 4,
+  "run_id": 2,
+  "objective": {
+    "makespan_minutes": 270,
+    "weighted_priority_completion": 2970,
+    "soft_penalty_scaled": 0
+  },
+  "schedule": [
+    {
+      "task_id": 10,
+      "task_name": "Development",
+      "start_offset_minutes": 0,
+      "end_offset_minutes": 180,
+      "start_time": "2026-09-16T03:30:00Z",
+      "end_time": "2026-09-16T06:30:00Z",
+      "duration_minutes": 180,
+      "priority": "high",
+      "assigned_resources": [
+        {
+          "resource_id": 12,
+          "name": "Developer Pool",
+          "resource_type": "developer",
+          "units": 2
+        }
+      ]
+    },
+    {
+      "task_id": 12,
+      "task_name": "Documentation",
+      "start_offset_minutes": 0,
+      "end_offset_minutes": 45,
+      "start_time": "2026-09-16T03:30:00Z",
+      "end_time": "2026-09-16T04:15:00Z",
+      "duration_minutes": 45,
+      "priority": "medium",
+      "assigned_resources": []
+    },
+    {
+      "task_id": 11,
+      "task_name": "Testing",
+      "start_offset_minutes": 180,
+      "end_offset_minutes": 270,
+      "start_time": "2026-09-16T06:30:00Z",
+      "end_time": "2026-09-16T08:00:00Z",
+      "duration_minutes": 90,
+      "priority": "critical",
+      "assigned_resources": [
+        {
+          "resource_id": 10,
+          "name": "Ravi",
+          "resource_type": "developer",
+          "units": 1
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "task_count": 3,
+    "scheduled_task_count": 3,
+    "planning_horizon_minutes": 540,
+    "makespan_minutes": 270,
+    "solver_wall_time_ms": 3.52
+  },
+  "warnings": []
+}

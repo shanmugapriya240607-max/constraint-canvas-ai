@@ -19,6 +19,8 @@ from app.schemas.planning import (
 from app.services.planning import (
     apply_values, delete_record, ensure_acyclic, full_plan, merge_state, persist, validate_state,
 )
+from app.schemas.analysis import PlanAnalysisResponse
+from app.services.analysis_engine import analyze_plan
 
 router = APIRouter(prefix="/api/plans", tags=["planning data"])
 
@@ -57,6 +59,11 @@ def remove_plan(plan: WritablePlan, db: Database):
 @router.get("/{plan_id}/full", response_model=FullPlanResponse)
 def read_full_plan(plan: OwnedPlan, db: Database):
     return full_plan(db, plan)
+
+
+@router.get("/{plan_id}/analysis", response_model=PlanAnalysisResponse)
+def get_plan_analysis(plan: OwnedPlan, db: Database):
+    return analyze_plan(db, plan)
 
 
 @router.post("/{plan_id}/resources", response_model=ResourceResponse, status_code=201)

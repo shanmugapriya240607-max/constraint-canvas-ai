@@ -259,12 +259,7 @@ def analyze_risks_and_bottlenecks(snapshot, run) -> tuple[list[Risk], list[Bottl
     return risks, bottlenecks, factors
 
 
-def analyze_plan(db, plan) -> PlanAnalysisResponse:
-    run = _get_latest_solver_run(db, plan.id)
-    snapshot = full_plan(db, plan)
-    
-    status = run.solver_status if run else plan.status
-    
+def analyze_snapshot(snapshot, run, status: str) -> PlanAnalysisResponse:
     issues = []
     recovery_options = []
     risks = []
@@ -272,20 +267,18 @@ def analyze_plan(db, plan) -> PlanAnalysisResponse:
     factors = []
     score = 100
     
-    # Run infeasibility check always to find possible issues even in feasible plans (warnings) or hard errors
     inf_issues, inf_recovery = analyze_infeasibility(snapshot)
     
     if status == "infeasible" or not run or run.solver_status == "infeasible":
         issues = inf_issues
         recovery_options = inf_recovery
-        score = 20  # Base score for infeasible
+        score = 20
         factors.append(HealthFactor(name="Infeasibility", impact=-80, reason="The plan cannot be scheduled with current constraints."))
         grade = "critical"
     else:
         risks, bottlenecks, dyn_factors = analyze_risks_and_bottlenecks(snapshot, run)
         factors.extend(dyn_factors)
         
-        # Deduct score
         for f in factors:
             score += f.impact
             
@@ -304,7 +297,7 @@ def analyze_plan(db, plan) -> PlanAnalysisResponse:
             grade = "critical"
             
     return PlanAnalysisResponse(
-        plan_id=plan.id,
+        plan_id=snapshot.plan.id,
         status=status,
         issues=issues,
         recovery_options=recovery_options,
@@ -312,3 +305,9 @@ def analyze_plan(db, plan) -> PlanAnalysisResponse:
         bottlenecks=bottlenecks,
         health=PlanHealth(score=score, grade=grade, factors=factors)
     )
+
+def analyze_plan(db, plan) -> PlanAnalysisResponse:
+    run = _get_latest_solver_run(db, plan.id)
+    snapshot = full_plan(db, plan)
+    status = run.solver_status if run else plan.status
+    return analyze_snapshot(snapshot, run, status)

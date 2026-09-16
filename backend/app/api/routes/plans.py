@@ -21,6 +21,8 @@ from app.services.planning import (
 )
 from app.schemas.analysis import PlanAnalysisResponse
 from app.services.analysis_engine import analyze_plan
+from app.schemas.whatif import WhatIfRequest, WhatIfResponse, CompareScenariosRequest, ScenarioComparisonResponse
+from app.services.whatif_engine import simulate_what_if, compare_scenarios
 
 router = APIRouter(prefix="/api/plans", tags=["planning data"])
 
@@ -64,6 +66,16 @@ def read_full_plan(plan: OwnedPlan, db: Database):
 @router.get("/{plan_id}/analysis", response_model=PlanAnalysisResponse)
 def get_plan_analysis(plan: OwnedPlan, db: Database):
     return analyze_plan(db, plan)
+
+
+@router.post("/{plan_id}/what-if", response_model=WhatIfResponse)
+def run_what_if_simulation(request: WhatIfRequest, plan: OwnedPlan, db: Database):
+    return simulate_what_if(db, plan, request)
+
+
+@router.post("/{plan_id}/compare-scenarios", response_model=ScenarioComparisonResponse)
+def compare_plan_scenarios(request: CompareScenariosRequest, plan: OwnedPlan, db: Database):
+    return compare_scenarios(db, plan, request)
 
 
 @router.post("/{plan_id}/resources", response_model=ResourceResponse, status_code=201)

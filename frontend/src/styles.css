@@ -1114,3 +1114,30 @@ h3 {
     transition: none !important;
   }
 }
+
+/* Wizard Styles */
+.wizard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--card-bg);
+}
+
+.wizard-content-area {
+  padding-bottom: 2rem;
+}
+
+@media (max-width: 600px) {
+  .wizard-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 10;
+  }
+  .wizard-content-area {
+    padding-bottom: 120px;
+  }
+}

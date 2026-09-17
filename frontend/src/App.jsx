@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Placeholder from "./pages/Placeholder";
+import CreatePlan from "./pages/CreatePlan";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AppLayout from "./layouts/AppLayout";
 
@@ -32,7 +33,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route
             path="/plans/new"
-            element={<Placeholder title="New Plan" icon="plus" />}
+            element={<CreatePlan />}
           />
           <Route
             path="/plans"

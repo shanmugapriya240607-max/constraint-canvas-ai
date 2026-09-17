@@ -243,7 +243,6 @@ test("login returns to intended protected route and shell links stay placeholder
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/settings$/);
   for (const name of [
-    "New Plan",
     "Planning History",
     "What-If Simulator",
     "Memory",

@@ -8,6 +8,7 @@ import CreatePlan from "./pages/CreatePlan";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AppLayout from "./layouts/AppLayout";
 import PlanResults from "./pages/PlanResults";
+import WhatIfSimulator from "./pages/WhatIfSimulator";
 
 export default function App() {
   const { pathname } = useLocation();
@@ -46,7 +47,11 @@ export default function App() {
           />
           <Route
             path="/what-if"
-            element={<Placeholder title="What-If Simulator" icon="branch" />}
+            element={<WhatIfSimulator />}
+          />
+          <Route
+            path="/plans/:planId/what-if"
+            element={<WhatIfSimulator />}
           />
           <Route
             path="/memory"

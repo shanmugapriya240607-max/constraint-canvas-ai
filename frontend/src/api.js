@@ -93,3 +93,55 @@ export async function getHistoryRun(id) {
     throw error;
   }
 }
+
+export async function runWhatIf(planId, payload) {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/plans/${planId}/what-if`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }, 45000);
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorMessage = data?.detail || `Simulation failed (${response.status})`;
+      throw new Error(errorMessage);
+    }
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Simulation timed out. Please try again.");
+    }
+    console.error("runWhatIf API error:", error);
+    throw error;
+  }
+}
+
+export async function compareScenarios(planId, payload) {
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/plans/${planId}/compare-scenarios`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }, 45000);
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const errorMessage = data?.detail || `Scenario comparison failed (${response.status})`;
+      throw new Error(errorMessage);
+    }
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Comparison timed out. Please try again.");
+    }
+    console.error("compareScenarios API error:", error);
+    throw error;
+  }
+}

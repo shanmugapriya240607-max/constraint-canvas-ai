@@ -166,3 +166,19 @@ export async function getSolverRuns(planId) {
 export async function getSolverRun(planId, runId) {
   return api(`/api/plans/${planId}/runs/${runId}`, { method: "GET" });
 }
+
+export async function getFullPlan(planId) {
+  return api(`/api/plans/${planId}`, { method: "GET" });
+}
+
+export async function getPlans() {
+  return api(`/api/plans`, { method: "GET" });
+}
+
+export async function getResources(planId) {
+  return api(`/api/plans/${planId}/resources`, { method: "GET" });
+}
+
+export async function getTasks(planId) {
+  return api(`/api/plans/${planId}/tasks`, { method: "GET" });
+}

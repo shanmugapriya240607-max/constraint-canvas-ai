@@ -10,6 +10,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import sessionmaker
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.ai_parser import router as ai_parser_router
 from app.api.routes.plans import router as plans_router
 from app.api.routes.solver import router as solver_router
 from app.api.routes.health import router as health_router
@@ -67,6 +68,7 @@ def create_app(config: Settings = settings, db_engine: Engine | None = None) -> 
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(ai_parser_router)
     application.include_router(plans_router)
     application.include_router(memory_router)
     application.include_router(solver_router)

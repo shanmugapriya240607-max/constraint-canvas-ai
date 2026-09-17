@@ -400,3 +400,158 @@ Swagger, plan statuses, and database history. It writes actual responses without
 credentials to examples/solver_feasible.json, solver_infeasible.json, and
 solver_original_expo.json. It also creates the separate two-unit/three-unit-demand
 infeasible scenario. All prior CRUD and authentication tests remain in the suite.
+
+## B5: Gemini planning input (preview, then explicit confirmation)
+
+This module adds no scheduling behavior. Gemini extracts facts; the existing
+manual APIs and OR-Tools remain independent and available without an API key.
+
+Configuration uses `GeminiSettings`, a scoped extension of the existing Settings
+class in `app/services/ai/gemini_client.py`. It inherits the same environment and
+backend/.env loading policy without changing shared settings or authentication.
+
+- `GEMINI_API_KEY`: optional secret. Missing/blank returns 503 only for parsing.
+- `GEMINI_MODEL`: defaults to `gemini-2.5-flash`; override for your account/model lifecycle.
+- `GEMINI_TIMEOUT_SECONDS`: defaults to 30, bounded to 1–120 seconds.
+- Client: existing `httpx` dependency, Google's official structured JSON REST
+  generateContent API; no additional SDK or startup network call.
+- Provider responses are bounded. No automatic retries, function calls, tools,
+  code execution, schedules, or raw upstream error logging.
+- Documentation: [structured output](https://ai.google.dev/gemini-api/docs/generate-content/structured-output)
+  and [model catalog](https://ai.google.dev/gemini-api/docs/models).
+
+### POST /api/ai/parse-plan
+
+Authentication: Bearer access token.
+
+```json
+{
+  "text": "Testing takes 3. Testing is critical and must finish before 5 PM.",
+  "existing_plan_id": 4,
+  "include_context": false
+}
+```
+
+Only text is required. Existing plan IDs are ownership-checked before the provider
+call and never mutated. Context is opt-in and requires both a plan ID and memory
+consent. Only the existing context router is consulted. Suggestions stay local,
+separate in `suggested_context`, with `requires_confirmation: true`; no memories
+are sent to Gemini or silently applied.
+
+The response includes `status` (ready / needs_clarification / invalid), `draft`,
+`questions`, `errors`, `constraint_support`, validated `custom_values`, and
+`requires_confirmation: true`. Ready means structured for review, not feasible
+or already persisted. Parsing writes no database records.
+
+Draft collections: plan, resources, tasks, requirements, dependencies, constraints,
+custom_fields, custom_values, missing_information, ambiguities, evidence.
+Resources/tasks have stable string client IDs. Requirements and dependencies use
+those IDs; database IDs are never accepted as references. Scalars without source
+facts remain null. Priority is not defaulted. Duration units are seconds/minutes/
+hours; conversion reuses the domain's exact rounding-up-to-minutes logic.
+Date/time fields require an explicit date and timezone. A clock-only deadline
+is preserved in `deadline_text`, with `deadline: null` and a clarification.
+
+Exact source quotations support extracted values. Unsupported evidence, numeric
+quantities, units, priorities or ISO timestamps trigger confirmation questions.
+This conservative check can also flag legitimately spelled-out numbers or
+natural-language dates: user review resolves them. Evidence is a guardrail, not
+a proof of semantic accuracy. Always review the extracted draft.
+
+Example mocked extraction for "Testing takes 3.":
+
+```json
+{
+  "status": "needs_clarification",
+  "draft": {
+    "plan": {},
+    "tasks": [{
+      "client_id": "testing",
+      "name": "Testing",
+      "duration_value": 3,
+      "duration_unit": null,
+      "priority": null
+    }],
+    "resources": []
+  },
+  "questions": [
+    {
+      "id": "q5",
+      "field": "tasks.0.duration_unit",
+      "question": "Please confirm tasks.0.duration_unit.",
+      "reason": "Required planning information was not specified.",
+      "allowed_answers": ["seconds", "minutes", "hours"]
+    }
+  ],
+  "requires_confirmation": true
+}
+```
+
+This is an abbreviated response: questions also cover missing plan name,
+planning start/end and task priority. Question IDs are sorted deterministically;
+clients should associate answers with field paths, not positional question IDs.
+
+### POST /api/ai/confirm-plan
+
+Send `{"confirmed": true, "draft": <reviewed draft>, "answers": [...]}`.
+Each answer has a `field` path and JSON `value`, for example
+`{"field":"tasks.0.duration_unit","value":"minutes"}`.
+The accepted scalar paths are plan fields, task/resource fields (except
+client_id), and declared custom_values fields. Complete collection replacements
+are also supported. For more complex corrections, edit the draft, explicitly
+resolve its missing_information/ambiguities, and submit it for confirmation.
+No answers are interpreted as code. Saved memory must be reviewed and incorporated
+explicitly into the draft; confirmation does not apply context automatically.
+
+The full draft is revalidated, including references, resource types/names,
+dependency cycles (including constraint edges), domain schemas, and custom data.
+Unresolved questions or invalid data return 422. Creation is one transaction:
+plan, resources, availability, tasks, requirements, dependencies and constraints
+all commit together or roll back. The current authenticated user owns the new
+draft plan. This always creates a NEW plan; it never changes existing_plan_id.
+A 201 response includes plan_id, status: created, and created_counts.
+Confirmation is not idempotent; submitting twice creates two plans.
+
+### Controlled runtime fields and solver mapping
+
+Pydantic v2 `create_model()` uses only a fixed mapping of string, integer, float,
+boolean, timezone-aware datetime, and time. Numeric minimum/maximum bounds,
+required fields, unique safe names and strict types are enforced. JSON ISO strings
+are accepted for datetime/time; coercions such as "6" into integer are rejected.
+Definitions are capped at 30. Unknown keys and executable expressions are rejected
+as schema structure; code-like string VALUES remain inert text.
+
+Operator vocabulary: =, !=, <, <=, >, >=, before, after, depends_on.
+Accepting an operator as data does not imply solver support.
+
+Explicit adapters use existing solver parameter schemas:
+- hard deadline: before / <=
+- hard dependency: before / depends_on, with before_task_id -> after_task_id
+- hard resource_capacity: = / <=
+- hard availability: =
+- hard max_work_hours: <= (the existing solver's per-horizon limit, not a new daily rule)
+- soft preferred_resource: =
+- soft preferred_time: before / <=
+
+A supported adapter remaps client IDs to newly created IDs and validates all
+parameters. `before` on deadline/preferred_time uses the existing solver's
+inclusive end-time bound; strict <, reversed comparisons, unsupported hardness
+and unknown semantics have no adapter. They return solver_supported: false and
+are persisted as disabled custom rules. All dynamic custom field values are
+also inert, stored in a disabled custom metadata rule. Runtime validation
+NEVER installs a new solver constraint implementation.
+
+### Errors and verification
+
+Malformed/schema-invalid extraction: status invalid with sanitized errors.
+Bad caller/confirmation data: 422. Unknown/foreign existing plan: 404.
+Missing or unauthorized provider key/network: 503. Timeout: 504.
+Rate limit: 429 with Retry-After. Other upstream failures or incomplete envelopes:
+502. Provider keys/bodies and stack traces are never returned to clients.
+
+Run from backend with the existing virtual environment:
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+Tests use fake provider extraction and httpx.MockTransport. They never call Gemini.
+Normal API tests use temporary databases. No frontend integration is included.

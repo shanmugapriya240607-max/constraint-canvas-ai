@@ -150,3 +150,19 @@ export async function submitFullPlan(wizardState) {
 
   return { planId, counts };
 }
+
+export async function solvePlan(planId) {
+  return api(`/api/plans/${planId}/solve`, { method: "POST" });
+}
+
+export async function getPlanAnalysis(planId) {
+  return api(`/api/plans/${planId}/analysis`, { method: "GET" });
+}
+
+export async function getSolverRuns(planId) {
+  return api(`/api/plans/${planId}/runs`, { method: "GET" });
+}
+
+export async function getSolverRun(planId, runId) {
+  return api(`/api/plans/${planId}/runs/${runId}`, { method: "GET" });
+}

@@ -7,6 +7,7 @@ import Placeholder from "./pages/Placeholder";
 import CreatePlan from "./pages/CreatePlan";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AppLayout from "./layouts/AppLayout";
+import PlanResults from "./pages/PlanResults";
 
 export default function App() {
   const { pathname } = useLocation();
@@ -34,6 +35,10 @@ export default function App() {
           <Route
             path="/plans/new"
             element={<CreatePlan />}
+          />
+          <Route
+            path="/plans/:planId/results"
+            element={<PlanResults />}
           />
           <Route
             path="/plans"

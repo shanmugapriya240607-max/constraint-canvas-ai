@@ -371,7 +371,13 @@ def test_network_and_timeout_are_sanitized(exception, expected):
     assert "test-secret" not in str(error.value.detail)
 
 
-@pytest.mark.parametrize("body", [{}, {"candidates": []}, {"candidates": [{"finishReason": "MAX_TOKENS"}]}])
+@pytest.mark.parametrize("body", [
+    {}, {"status": "completed", "steps": []},
+    {"status": "completed", "steps": ["bad"]},
+    {"status": "incomplete", "steps": []},
+    {"status": "completed", "steps": None},
+    {"status": "completed", "steps": [{"type": "model_output", "content": [{"type": "text", "text": 42}]}]},
+])
 def test_malformed_provider_envelope(body):
     with pytest.raises(HTTPException) as error:
         GeminiClient(settings(), httpx.MockTransport(lambda _: httpx.Response(200, json=body))).extract(TEXT)
@@ -383,11 +389,22 @@ def test_rest_configuration_and_structured_response():
         assert "test-secret" not in str(request.url)
         assert request.headers["x-goog-api-key"] == "test-secret-do-not-log"
         payload = json.loads(request.content)
-        assert payload["generationConfig"]["responseMimeType"] == "application/json"
-        assert payload["generationConfig"]["responseJsonSchema"]["type"] == "object"
-        assert "tools" not in payload
-        return httpx.Response(200, json={"candidates": [{"finishReason": "STOP",
-            "content": {"parts": [{"text": json.dumps(example())}]}}]})
+        assert request.url.path == "/v1beta/interactions"
+        assert set(payload) == {"model", "input", "system_instruction", "response_format", "generation_config", "store"}
+        assert payload["model"] == "gemini-3.6-flash"
+        assert payload["store"] is False
+        assert payload["generation_config"] == {"max_output_tokens": 16000}
+        from app.services.ai.gemini_client import extraction_json_schema, INSTRUCTION
+        assert payload["response_format"] == {
+            "type": "text", "mime_type": "application/json", "schema": extraction_json_schema(),
+        }
+        assert payload["input"] == TEXT
+        assert payload["system_instruction"] == INSTRUCTION
+        return httpx.Response(200, json={"status": "completed", "steps": [
+            {"type": "user_input", "content": [{"type": "text", "text": "not the answer"}]},
+            {"type": "thought", "summary": [{"type": "text", "text": "not the answer"}]},
+            {"type": "model_output", "content": [{"type": "text", "text": json.dumps(example())}]},
+        ]})
     result = parse_plan(GeminiClient(settings(), httpx.MockTransport(serve)), TEXT)
     assert result.status == "ready"
 
@@ -406,7 +423,11 @@ def test_invented_quantity_or_date_needs_confirmation(field, value):
 def test_available_schema_has_no_recursive_json_reference():
     from app.services.ai.gemini_client import extraction_json_schema
     schema = extraction_json_schema()
-    assert "$ref" not in json.dumps(schema["$defs"]["JsonValue"])
+    encoded = json.dumps(schema, allow_nan=False)
+    for keyword in ("$ref", "$defs", "anyOf", "default", "title"):
+        assert '"' + keyword + '"' not in encoded
+    assert "parameters_json" in schema["properties"]["constraints"]["items"]["properties"]
+    assert "evidence" in schema["properties"]
 
 
 def test_confirm_rejects_integer_truthiness(client, actors):
@@ -472,3 +493,159 @@ def test_large_incomplete_preview_round_trips_through_confirmation_schema():
     assert not preview.custom_fields_solver_supported
     confirmed = ConfirmPlanRequest.model_validate({'confirmed': True, 'draft': preview.draft.model_dump(mode='json')})
     assert inspect_draft(confirmed.draft).status == 'needs_clarification'
+
+@pytest.mark.parametrize("status,category,expected", [
+    (400, "invalid_request", 502), (401, "authentication", 503),
+    (403, "authentication", 503), (404, "model_unavailable", 503),
+    (429, "rate_limit", 429), (500, "upstream_server", 502), (503, "upstream_server", 502),
+])
+def test_live_diagnostics_are_redacted_and_never_returned_to_clients(status, category, expected, caplog):
+    message = 'Unsupported schema property. key=test-secret-do-not-log password=private-password'
+    transport = httpx.MockTransport(lambda _: httpx.Response(status, json={"error": {"message": message}}))
+    client = GeminiClient(settings(), transport)
+    with pytest.raises(HTTPException) as error:
+        client.extract(TEXT)
+    assert error.value.status_code == expected
+    assert client.last_failure["upstream_status"] == status
+    assert client.last_failure["category"] == category
+    assert client.last_failure["model"] == "gemini-3.6-flash"
+    assert "Unsupported schema property" in client.last_failure["message"]
+    combined = caplog.text + json.dumps(client.last_failure) + str(error.value.detail)
+    assert "test-secret-do-not-log" not in combined
+    assert "private-password" not in combined
+    assert "Unsupported schema property" not in str(error.value.detail)
+    if status == 429:
+        assert error.value.headers["Retry-After"] == "60"
+
+
+def test_http_error_bodies_are_bounded_and_not_logged(caplog):
+    client = GeminiClient(settings(), httpx.MockTransport(
+        lambda _: httpx.Response(400, content=b"x" * 20000)))
+    with pytest.raises(HTTPException):
+        client.extract(TEXT)
+    assert client.last_failure["category"] == "invalid_request"
+    assert client.last_failure["message"] == "No structured upstream error message"
+    assert "xxxxx" not in caplog.text
+
+
+def test_configured_model_endpoint_and_no_retries():
+    requests = []
+    def serve(request):
+        requests.append(request)
+        assert str(request.url).endswith("/v1beta/interactions")
+        assert json.loads(request.content)["model"] == "gemini-test-model"
+        assert request.headers["x-goog-api-key"] == "test-secret-do-not-log"
+        raise httpx.ReadTimeout("test-secret-do-not-log", request=request)
+    client = GeminiClient(settings(gemini_model="gemini-test-model"), httpx.MockTransport(serve))
+    with pytest.raises(HTTPException):
+        client.extract(TEXT)
+    assert len(requests) == 1
+    assert client.last_failure["category"] == "timeout"
+
+
+def test_diagnostics_redact_other_configured_secrets_and_input(caplog):
+    private = "private-jwt-secret-with-more-than-32-bytes"
+    text = "Private planning instructions."
+    message = f"Rejected {text} credential {private}"
+    client = GeminiClient(settings(jwt_secret_key=private), httpx.MockTransport(
+        lambda _: httpx.Response(400, json={"error": {"message": message}})))
+    with pytest.raises(HTTPException):
+        client.extract(text)
+    assert private not in caplog.text
+    assert text not in caplog.text
+
+
+
+def test_diagnostics_redact_bearer_header():
+    from app.services.ai.gemini_client import sanitize_upstream_message
+    message = sanitize_upstream_message('Authorization: Bearer private-token', [])
+    assert 'private-token' not in message
+
+
+@pytest.mark.parametrize("status", ["incomplete", "failed", "requires_action", "in_progress", "cancelled"])
+def test_interaction_must_complete_without_followup(status, caplog):
+    calls = []
+    def serve(request):
+        calls.append(request)
+        return httpx.Response(200, json={"status": status, "error": {"message": "Rejected test-secret-do-not-log"},
+            "steps": [{"type": "model_output", "content": [{"type": "text", "text": "{}"}]}]})
+    client = GeminiClient(settings(), httpx.MockTransport(serve))
+    with pytest.raises(HTTPException) as error:
+        client.extract(TEXT)
+    assert error.value.status_code == 502
+    assert len(calls) == 1
+    assert client.last_failure["category"] == "incomplete_response"
+    assert "test-secret-do-not-log" not in caplog.text
+
+
+def test_completed_interaction_without_model_text_rejected():
+    client = GeminiClient(settings(), httpx.MockTransport(lambda _: httpx.Response(200, json={
+        "status": "completed", "steps": [{"type": "function_call", "name": "never_execute", "arguments": {}}],
+    })))
+    with pytest.raises(HTTPException):
+        client.extract(TEXT)
+
+
+def test_model_environment_override(monkeypatch):
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-test-model")
+    assert GeminiSettings(_env_file=None).gemini_model == "gemini-test-model"
+
+
+def test_transport_conversion_preserves_full_validation():
+    from app.services.ai.gemini_schema import to_planning_json
+    data = example()
+    data["constraints"] = [{"semantic": "deadline", "operator": "before", "hardness": "hard", "weight": None,
+        "parameters_json": json.dumps({"task_id": "test", "deadline": DEADLINE})}]
+    draft = PlanningDraft.model_validate_json(to_planning_json(json.dumps(data)))
+    assert draft.constraints[0].parameters == {"task_id": "test", "deadline": DEADLINE}
+    assert draft.tasks[0].duration_value == Decimal("3")
+    assert draft.tasks[1].priority == "critical"
+    assert draft.requirements[1].required_resource_id == "ravi"
+    assert draft.custom_fields == [] and draft.custom_values == {}
+
+
+@pytest.mark.parametrize("parameters", ['{"x":1,"x":2}', '{"x":NaN}', '[]', '__import__("os").system("echo unsafe")'])
+def test_transport_rejects_invalid_parameter_strings(parameters):
+    from app.services.ai.gemini_schema import to_planning_json
+    data = example()
+    data["constraints"] = [{"semantic": "custom", "operator": "=", "parameters_json": parameters}]
+    with pytest.raises(ValueError):
+        to_planning_json(json.dumps(data))
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda data: data["tasks"][0].update(duration_value=-1),
+    lambda data: data["tasks"][0].update(priority="urgent"),
+    lambda data: data["plan"].update(planning_start="tomorrow"),
+    lambda data: data.update(unexpected="must not be dropped"),
+])
+def test_transport_does_not_weaken_domain_validation(mutation):
+    from app.services.ai.gemini_schema import to_planning_json
+    data = example()
+    mutation(data)
+    with pytest.raises(ValueError):
+        to_planning_json(json.dumps(data))
+
+
+def test_transport_duplicate_root_and_conflicting_parameters_rejected():
+    from app.services.ai.gemini_schema import to_planning_json
+    with pytest.raises(ValueError):
+        to_planning_json('{"plan":{},"plan":{}}')
+    data = example()
+    data["constraints"] = [{"semantic": "custom", "operator": "=", "parameters": {}, "parameters_json": "{}"}]
+    with pytest.raises(ValueError):
+        to_planning_json(json.dumps(data))
+
+
+def test_transport_preserves_unanchored_deadline_and_ambiguities():
+    from app.services.ai.gemini_schema import to_planning_json
+    data = example()
+    data["tasks"][1]["deadline"] = None
+    data["tasks"][1]["deadline_text"] = "5 PM"
+    data["resources"][1]["resource_type"] = None
+    data["resources"][1]["capacity"] = None
+    data["ambiguities"] = [{"field": "resources.1.resource_type", "reason": "Ravi's role is unspecified"}]
+    draft = PlanningDraft.model_validate_json(to_planning_json(json.dumps(data)))
+    assert draft.tasks[1].deadline is None and draft.tasks[1].deadline_text == "5 PM"
+    assert draft.resources[1].capacity is None
+    assert inspect_draft(draft).status == "needs_clarification"

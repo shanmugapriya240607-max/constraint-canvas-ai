@@ -4,7 +4,7 @@ export default function StatusHeader({ status, health, solverRuns }) {
   return (
     <div className={`status-header ${status.toLowerCase()}`}>
       <div className="status-badge">
-        <h2>{status} PLAN</h2>
+        <h2>{status.toUpperCase()} PLAN</h2>
       </div>
       
       <div className="status-metrics">
@@ -20,8 +20,8 @@ export default function StatusHeader({ status, health, solverRuns }) {
             <div className="metric">
               <span className="label">Completion Time</span>
               <span className="value">
-                {latestRun.makespan 
-                  ? new Date(latestRun.makespan).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+                {latestRun.makespan_minutes != null
+                  ? `${latestRun.makespan_minutes} min`
                   : "N/A"}
               </span>
             </div>

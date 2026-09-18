@@ -106,7 +106,7 @@ export async function submitFullPlan(wizardState) {
       await createTaskRequirement(planId, backendTaskId, {
         resource_type: req.resourceType,
         quantity: parseInt(req.quantity, 10),
-        specific_resource_id: req.specificResourceId
+        required_resource_id: req.specificResourceId
           ? resourceIdMap[req.specificResourceId] || null
           : null,
       });
@@ -139,11 +139,14 @@ export async function submitFullPlan(wizardState) {
       mappedDefinition.after_task_id = taskIdMap[mappedDefinition.after_task_id];
     }
     
+    for (const field of ["deadline", "available_from", "available_until", "preferred_before"]) {
+      if (mappedDefinition[field]) mappedDefinition[field] = new Date(mappedDefinition[field]).toISOString();
+    }
     await createConstraint(planId, {
       constraint_type: constraint.type,
       hardness: constraint.hardness,
       weight: constraint.hardness === "soft" ? parseFloat(constraint.weight || 1.0) : null,
-      definition: mappedDefinition,
+      parameters: mappedDefinition,
     });
     counts.constraints++;
   }
@@ -152,7 +155,7 @@ export async function submitFullPlan(wizardState) {
 }
 
 export async function solvePlan(planId) {
-  return api(`/api/plans/${planId}/solve`, { method: "POST" });
+  return api(`/api/plans/${planId}/solve`, { method: "POST", timeoutMs: 40000 });
 }
 
 export async function getPlanAnalysis(planId) {
@@ -168,7 +171,7 @@ export async function getSolverRun(planId, runId) {
 }
 
 export async function getFullPlan(planId) {
-  return api(`/api/plans/${planId}`, { method: "GET" });
+  return api(`/api/plans/${planId}/full`, { method: "GET" });
 }
 
 export async function getPlans() {

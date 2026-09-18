@@ -13,16 +13,17 @@ export function setUnauthorizedHandler(handler) {
 }
 
 export class ApiError extends Error {
-  constructor(message, status = 0, fields = {}) {
+  constructor(message, status = 0, fields = {}, detail = null) {
     super(message);
     this.status = status;
     this.fields = fields;
+    this.detail = detail;
   }
 }
 
 export async function api(
   path,
-  { method = "GET", body, authenticated = true } = {},
+  { method = "GET", body, authenticated = true, timeoutMs = 15000 } = {},
 ) {
   const session = authenticated ? readSession() : null;
   if (authenticated && !session) {
@@ -30,7 +31,7 @@ export async function api(
     throw new ApiError("Your session has expired. Please sign in again.", 401);
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(BASE_URL + path, {
       method,
@@ -64,13 +65,14 @@ export async function api(
       const message =
         response.status >= 500
           ? "The service is temporarily unavailable. Please try again."
-          : typeof data?.detail === "string"
+          : data?.detail?.message || (typeof data?.detail === "string"
             ? data.detail
             : response.status === 422
               ? "Please check the highlighted fields."
-              : "The request could not be completed. Please try again.";
-      throw new ApiError(message, response.status, fields);
+              : "The request could not be completed. Please try again.");
+      throw new ApiError(message, response.status, fields, response.status < 500 ? data?.detail : null);
     }
+    if (response.status === 204) return null;
     if (!data)
       throw new ApiError(
         "The server returned an unreadable response. Please try again.",

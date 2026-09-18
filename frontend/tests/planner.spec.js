@@ -87,12 +87,16 @@ test.describe('Create Plan Wizard', () => {
       await route.fulfill({ json: { id: 't1' } });
     });
     await page.route('**/api/plans/p1/tasks/t1/requirements', async route => {
+      expect(route.request().postDataJSON()).toHaveProperty('required_resource_id');
+      expect(route.request().postDataJSON()).not.toHaveProperty('specific_resource_id');
       await route.fulfill({ json: { id: 'req1' } });
     });
     await page.route('**/api/plans/p1/dependencies', async route => {
       await route.fulfill({ json: { id: 'dep1' } });
     });
     await page.route('**/api/plans/p1/constraints', async route => {
+      expect(route.request().postDataJSON().parameters.deadline).toMatch(/Z$/);
+      expect(route.request().postDataJSON()).not.toHaveProperty('definition');
       await route.fulfill({ json: { id: 'c1' } });
     });
 
@@ -144,6 +148,7 @@ test.describe('Create Plan Wizard', () => {
     // 7. Constraints
     await page.getByRole('button', { name: 'Add Constraint' }).click();
     await page.locator('select').nth(2).selectOption({ label: 'Test Task 1' }); // deadline constraint
+    await page.locator('.edit-form input[type="datetime-local"]').fill('2027-01-01T15:00');
     await page.locator('.edit-form button:text("Done")').click();
     await page.getByRole('button', { name: 'Next' }).click();
 

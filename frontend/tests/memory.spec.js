@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 
 async function mockMemoryApi(page) {
   let memoryEnabled = false;
-  let memories = [{ id: 1, type: "preference", key: "Preferred Tester", value: "Ravi", source: "user" }];
-  let habits = [{ id: 10, key: "Test Habit", value: "Value", suggestion_text: "We noticed a pattern" }];
+  let memories = [{ id: 1, memory_type: "preference", key: "Preferred Tester", value: { text: "Ravi" }, source: "user" }];
+  let habits = [{ id: 10, habit_type: "preferred_resource", normalized_pattern: "Test Habit", occurrence_count: 3, suggested_memory: {}, status: "pending" }];
 
   await page.route("**/api/memory/*", async (route) => {
     const method = route.request().method();
@@ -23,15 +23,17 @@ async function mockMemoryApi(page) {
     if (route.request().method() === "PUT") {
       const body = JSON.parse(route.request().postData());
       memoryEnabled = body.enabled;
-      await route.fulfill({ status: 200, json: { enabled: memoryEnabled } });
+      await route.fulfill({ status: 200, json: { memory_enabled: memoryEnabled } });
     } else {
-      await route.fulfill({ status: 200, json: { enabled: memoryEnabled } });
+      await route.fulfill({ status: 200, json: { memory_enabled: memoryEnabled } });
     }
   });
   
   await page.route("**/api/memory", async (route) => {
     if (route.request().method() === "POST") {
       const body = JSON.parse(route.request().postData());
+      expect(body.memory_type).toBe("preference");
+      expect(body.value).toEqual({ text: "Morning" });
       memories.push({ id: Date.now(), ...body });
       await route.fulfill({ status: 201, json: { id: 2, ...body } });
     } else {
@@ -58,7 +60,7 @@ async function mockMemoryApi(page) {
   });
 
   await page.route("**/api/plans/*/context", async (route) => {
-    await route.fulfill({ status: 200, json: [{ id: 1, key: "Test", value: "Context Memory" }] });
+    await route.fulfill({ status: 200, json: {plan_id: 1, memory_enabled: true, requires_confirmation: true, relevant_context: [{ memory_id: 1, type: "preferred_resource", reason: "Context Memory", suggested_use: {resource_id: 1} }]} });
   });
 
   await page.route("**/api/plans/*/context/apply", async (route) => {
@@ -107,6 +109,7 @@ test("saved memories render and can be created/deleted", async ({ page }) => {
   await expect(page.getByText("Preferred Tester: Ravi")).toBeVisible();
 
   // Create explicit memory
+  await page.getByRole("button", { name: "Enable Memory" }).click();
   await page.getByLabel("Key").fill("Preferred Time");
   await page.getByLabel("Value").fill("Morning");
   await page.getByRole("button", { name: "Save" }).click();

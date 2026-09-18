@@ -31,7 +31,7 @@ test.describe('Optimization Results', () => {
         status: 200,
         json: {
           plan_id: 1,
-          status: 'OPTIMAL',
+          status: 'optimal',
           health: { score: 95, grade: 'good', factors: [{ name: 'Slack', impact: 5, reason: 'Good slack' }] },
           risks: [],
           bottlenecks: [],
@@ -48,7 +48,7 @@ test.describe('Optimization Results', () => {
         json: [{
           id: 1,
           plan_id: 1,
-          status: 'OPTIMAL',
+          solver_status: 'optimal',
           makespan_minutes: 60,
           solve_duration_ms: 1500,
           created_at: new Date().toISOString()
@@ -109,7 +109,7 @@ test.describe('Optimization Results', () => {
         status: 200,
         json: {
           plan_id: 2,
-          status: 'INFEASIBLE',
+          status: 'infeasible',
           health: { score: 0, grade: 'critical', factors: [] },
           risks: [],
           bottlenecks: [],
@@ -126,7 +126,7 @@ test.describe('Optimization Results', () => {
         json: [{
           id: 2,
           plan_id: 2,
-          status: 'INFEASIBLE',
+          solver_status: 'infeasible',
           makespan_minutes: null,
           solve_duration_ms: 1200,
           created_at: new Date().toISOString()

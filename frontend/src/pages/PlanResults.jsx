@@ -41,7 +41,7 @@ export default function PlanResults() {
         setSolverRuns(runsData);
 
         // 4. If runs exist and optimal/feasible, fetch latest run detail
-        if (runsData && runsData.length > 0 && (analysisData.status === "OPTIMAL" || analysisData.status === "FEASIBLE")) {
+        if (runsData && runsData.length > 0 && (["optimal", "feasible"].includes(analysisData.status.toLowerCase()))) {
           const runDetail = await getSolverRun(planId, runsData[0].id || runsData[0].run_id);
           setLatestRunDetail(runDetail);
         }
@@ -83,7 +83,7 @@ export default function PlanResults() {
   }
 
   const { status, health, risks, bottlenecks, recovery_options, issues } = analysis;
-  const isInfeasible = status === "INFEASIBLE";
+  const isInfeasible = status.toLowerCase() === "infeasible";
 
   return (
     <div className="plan-results-page">

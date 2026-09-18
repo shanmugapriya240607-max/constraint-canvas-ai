@@ -23,9 +23,9 @@ export default function Dashboard({ summary = null, loading = false }) {
     async function loadMemory() {
       try {
         const c = await getMemoryConsent();
-        setMemoryEnabled(c.enabled);
+        setMemoryEnabled(c.memory_enabled);
         const h = await getHabitCandidates();
-        setHabitCount(h.length || 0);
+        setHabitCount(h.filter(item => item.status === "pending").length);
       } catch (e) {
         console.error(e);
       }

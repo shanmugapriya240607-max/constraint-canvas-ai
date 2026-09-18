@@ -6,6 +6,7 @@ export default function RelevantPlanningContext({ planId, onApplied }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [preview, setPreview] = useState(null);
 
   useEffect(() => {
     if (planId) {
@@ -17,8 +18,8 @@ export default function RelevantPlanningContext({ planId, onApplied }) {
     setLoading(true);
     try {
       const data = await getPlanContext(planId);
-      setContextItems(data.items || data || []);
-      const initialSelected = new Set((data.items || data || []).map(i => i.id));
+      setContextItems(data.relevant_context || []);
+      const initialSelected = new Set((data.relevant_context || []).map(i => i.memory_id));
       setSelectedIds(initialSelected);
     } catch (err) {
       setError(err.message);
@@ -30,15 +31,14 @@ export default function RelevantPlanningContext({ planId, onApplied }) {
   async function handleApply() {
     if (selectedIds.size === 0) return;
     try {
-      await applyPlanContext(planId, Array.from(selectedIds));
-      if (onApplied) onApplied();
+      setPreview(await applyPlanContext(planId, Array.from(selectedIds)));
     } catch (err) {
       setError(err.message);
     }
   }
 
   function handleIgnore() {
-    if (onApplied) onApplied();
+    setContextItems([]);
   }
 
   function toggleSelection(id) {
@@ -58,19 +58,20 @@ export default function RelevantPlanningContext({ planId, onApplied }) {
   return (
     <div className="card bg-surface" style={{ marginBottom: "1rem" }}>
       <h3 className="card-title">Relevant Planning Context Found</h3>
+      {preview && <p role="status">Context preview returned. Your saved plan and solver inputs are unchanged.</p>}
       <p className="text-muted" style={{ marginBottom: "1rem" }}>
         We found the following saved preferences that might apply to this plan:
       </p>
       
       <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" }}>
         {contextItems.map(item => (
-          <label key={item.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <label key={item.memory_id} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <input 
               type="checkbox" 
-              checked={selectedIds.has(item.id)}
-              onChange={() => toggleSelection(item.id)}
+              checked={selectedIds.has(item.memory_id)}
+              onChange={() => toggleSelection(item.memory_id)}
             />
-            <span>• {item.value || `${item.key}: ${item.value}`}</span>
+            <span>• {item.reason}: {JSON.stringify(item.suggested_use)}</span>
           </label>
         ))}
       </div>

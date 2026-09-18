@@ -232,7 +232,7 @@ test("verified session restores after reload and logout clears it", async ({
   await page.goBack();
   await expect(page).toHaveURL(/\/login$/);
 });
-test("login returns to intended protected route and shell links stay placeholders", async ({
+test("login returns to intended protected route and integrated shell links work", async ({
   page,
   isMobile,
 }) => {
@@ -242,18 +242,23 @@ test("login returns to intended protected route and shell links stay placeholder
   await page.getByLabel("Password", { exact: true }).fill("testing-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/settings$/);
-  for (const name of [
-    "Planning History",
-    "What-If Simulator",
-    "Memory",
-    "Settings",
+  await page.route("**/api/plans", route => route.fulfill({ json: [] }));
+  await page.route("**/api/memory", route => route.fulfill({ json: [] }));
+  await page.route("**/api/memory/habits", route => route.fulfill({ json: [] }));
+  await page.route("**/api/memory/consent", route => route.fulfill({ json: { memory_enabled: false } }));
+  for (const [name, heading, placeholder] of [
+    ["Planning History", "Planning History", true],
+    ["What-If Simulator", "Select a Plan for What-If Analysis", false],
+    ["Memory", "Planning Memory", false],
+    ["Settings", "Settings", true],
   ]) {
     if (isMobile) await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("link", { name, exact: true }).click();
     await expect(
-      page.getByRole("heading", { name, exact: true }),
+      page.getByRole("heading", { name: heading, exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("COMING LATER")).toBeVisible();
+    if (placeholder) await expect(page.getByText("COMING LATER")).toBeVisible();
+    else await expect(page.getByText("COMING LATER")).toBeHidden();
   }
 });
 test("invalid stored token is rejected by me and removed", async ({ page }) => {

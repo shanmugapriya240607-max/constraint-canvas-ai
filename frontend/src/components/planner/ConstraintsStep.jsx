@@ -16,12 +16,17 @@ export default function ConstraintsStep({
       const hasHardness = !!c.hardness;
       const hasValidWeight = c.hardness === "soft" ? parseFloat(c.weight) > 0 : true;
       let validDef = true;
-      if (c.type === "deadline") validDef = !!c.definition.task_id;
+      if (c.type === "deadline") validDef = !!c.definition.task_id && !!c.definition.deadline;
       if (c.type === "dependency")
         validDef = !!c.definition.before_task_id && !!c.definition.after_task_id;
       if (c.type === "preferred_resource")
         validDef = !!c.definition.task_id && !!c.definition.resource_id;
 
+      const requiredFields = {
+        resource_capacity: ["resource_id", "capacity"], availability: ["resource_id", "available_from", "available_until"],
+        max_work_hours: ["resource_id", "max_hours"], preferred_time: ["task_id", "preferred_before"],
+      };
+      if (requiredFields[c.type]) validDef = requiredFields[c.type].every(key => c.definition[key] !== undefined && c.definition[key] !== "");
       return hasType && hasHardness && hasValidWeight && validDef;
     });
     onValidationChange(isValid);
@@ -49,7 +54,7 @@ export default function ConstraintsStep({
       data.map((c) => {
         if (c.id === id) {
           if (field === "type") {
-            return { ...c, [field]: value, definition: {} };
+            return { ...c, [field]: value, definition: {}, hardness: value.startsWith("preferred_") ? "soft" : "hard" };
           }
           return { ...c, [field]: value };
         }
@@ -84,6 +89,10 @@ export default function ConstraintsStep({
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
+            <label>Deadline <span className="required">*</span>
+              <input type="datetime-local" value={constraint.definition.deadline || ""}
+                onChange={(e) => handleDefChange(constraint.id, "deadline", e.target.value)} />
+            </label>
           </div>
         );
       case "dependency":
@@ -144,6 +153,29 @@ export default function ConstraintsStep({
             </div>
           </div>
         );
+      case "resource_capacity":
+      case "availability":
+      case "max_work_hours":
+      case "preferred_time": {
+        const isTask = constraint.type === "preferred_time";
+        const entityField = isTask ? "task_id" : "resource_id";
+        const fields = { resource_capacity: ["capacity"], availability: ["available_from", "available_until"],
+          max_work_hours: ["max_hours"], preferred_time: ["preferred_before"] }[constraint.type];
+        return <div className="form-row">
+          <label>{isTask ? "Task" : "Resource"}<select value={constraint.definition[entityField] || ""}
+            onChange={e => handleDefChange(constraint.id, entityField, e.target.value)}>
+            <option value="">Select {isTask ? "Task" : "Resource"}</option>
+            {(isTask ? tasks : resources).map(entity => <option key={entity.id} value={entity.id}>{entity.name}</option>)}
+          </select></label>
+          {fields.map(field => {
+            const numeric = ["capacity", "max_hours"].includes(field);
+            return <label key={field}>{field.replaceAll("_", " ")}<input
+              type={numeric ? "number" : "datetime-local"} min={field === "capacity" ? 0 : 0.001} step={field === "capacity" ? 1 : "any"}
+              value={constraint.definition[field] ?? ""} onChange={e => handleDefChange(constraint.id, field,
+                numeric && e.target.value !== "" ? Number(e.target.value) : e.target.value)} /></label>;
+          })}
+        </div>;
+      }
       default:
         return (
           <div className="form-group full">
@@ -194,8 +226,8 @@ export default function ConstraintsStep({
                         value={constraint.hardness}
                         onChange={(e) => handleChange(constraint.id, "hardness", e.target.value)}
                       >
-                        <option value="hard">Hard (Must be met)</option>
-                        <option value="soft">Soft (Should be met)</option>
+                        <option value="hard" disabled={constraint.type.startsWith("preferred_")}>Hard (Must be met)</option>
+                        <option value="soft" disabled={!constraint.type.startsWith("preferred_")}>Soft (Should be met)</option>
                       </select>
                     </div>
                   </div>

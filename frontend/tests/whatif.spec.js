@@ -36,7 +36,7 @@ test.describe('What-If Simulator', () => {
         status: 200,
         json: {
           plan_id: 1,
-          status: 'OPTIMAL',
+          status: 'optimal',
           health: { score: 88, grade: 'good', factors: [] },
           risks: [],
           bottlenecks: [],
@@ -49,7 +49,7 @@ test.describe('What-If Simulator', () => {
     await page.route('**/api/plans/1/runs', async (route) => {
       await route.fulfill({
         status: 200,
-        json: [{ id: 1, plan_id: 1, status: 'OPTIMAL', makespan_minutes: 60 }]
+        json: [{ id: 1, plan_id: 1, solver_status: 'optimal', makespan_minutes: 60 }]
       });
     });
     
@@ -90,18 +90,21 @@ test.describe('What-If Simulator', () => {
     
     // Baseline state is visible
     await expect(page.locator('.empty-state')).toContainText('Baseline Plan');
-    await expect(page.locator('.baseline-metrics')).toContainText('OPTIMAL');
+    await expect(page.locator('.baseline-metrics')).toContainText('optimal');
+    await expect(page.locator('.baseline-metrics')).toContainText('Issues: 0');
   });
 
   test('can run a simulation with multiple changes and see impact', async ({ page }) => {
     // Mock simulation response
     await page.route('**/api/plans/1/what-if', async (route) => {
+      expect(route.request().headers().authorization).toBe('Bearer test-token');
+      expect(route.request().postDataJSON().changes[0].resource_id).toBe(101);
       await route.fulfill({
         status: 200,
         json: {
-          baseline: { status: 'OPTIMAL', makespan_minutes: 60, health: { score: 88 }, issues: [] },
-          scenario: { status: 'FEASIBLE', makespan_minutes: 150, health: { score: 63 }, issues: [{}] },
-          impact: { makespan_change_minutes: 90, health_score_change: -25, new_issues_count: 1, resolved_issues_count: 0 }
+          baseline: { status: 'optimal', makespan_minutes: 60, health_score: 88, deadline_violations: 0 },
+          scenario: { status: 'feasible', makespan_minutes: 150, health_score: 63, deadline_violations: 1 },
+          schedule: [], impact: { makespan_change_minutes: 90, health_change: -25, new_issues: [{ type: "resource_capacity", severity: "critical", message: "Capacity shortage" }], resolved_issues: [] }
         }
       });
     });
@@ -124,13 +127,14 @@ test.describe('What-If Simulator', () => {
 
   test('can save scenarios and compare them', async ({ page }) => {
     await page.route('**/api/plans/1/compare-scenarios', async (route) => {
+      expect(route.request().headers().authorization).toBe('Bearer test-token');
       await route.fulfill({
         status: 200,
         json: {
-          baseline: { status: 'OPTIMAL', makespan_minutes: 60, health: { score: 88 }, issues: [] },
+          baseline: { status: 'optimal', makespan_minutes: 60, health_score: 88, deadline_violations: 0 },
           scenarios: [
-            { name: 'S1', status: 'INFEASIBLE', makespan_minutes: null, health: { score: 0 }, issues: [{}] },
-            { name: 'S2', status: 'FEASIBLE', makespan_minutes: 50, health: { score: 90 }, issues: [] }
+            { name: 'S1', status: 'infeasible', makespan_minutes: null, health_score: 0, deadline_violations: 1, issues_count: 1 },
+            { name: 'S2', status: 'feasible', makespan_minutes: 50, health_score: 90, deadline_violations: 0, issues_count: 0 }
           ]
         }
       });

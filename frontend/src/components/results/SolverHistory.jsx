@@ -16,7 +16,7 @@ export default function SolverHistory({ runs }) {
           </thead>
           <tbody>
             {runs.slice(0, 5).map((run) => (
-              <tr key={run.id || run.run_id} className={run.status.toLowerCase()}>
+              <tr key={run.id || run.run_id} className={run.solver_status.toLowerCase()}>
                 <td>
                   {new Date(run.created_at).toLocaleTimeString([], {
                     hour: "2-digit",
@@ -24,17 +24,12 @@ export default function SolverHistory({ runs }) {
                   })}
                 </td>
                 <td>
-                  <span className={`status-badge-small ${run.status.toLowerCase()}`}>
-                    {run.status}
+                  <span className={`status-badge-small ${run.solver_status.toLowerCase()}`}>
+                    {run.solver_status}
                   </span>
                 </td>
                 <td>
-                  {run.makespan
-                    ? new Date(run.makespan).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "-"}
+                  {run.makespan_minutes != null ? `${run.makespan_minutes} min` : "-"}
                 </td>
                 <td>
                   {run.solve_duration_ms

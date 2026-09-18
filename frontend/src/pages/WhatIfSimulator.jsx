@@ -74,7 +74,7 @@ export default function WhatIfSimulator() {
         setResources(res);
         setTasks(tsk);
         
-        if (runs && runs.length > 0 && (analysis.status === "OPTIMAL" || analysis.status === "FEASIBLE")) {
+        if (runs && runs.length > 0 && (["optimal", "feasible"].includes(analysis.status.toLowerCase()))) {
           const runDetail = await getSolverRun(planId, runs[0].id || runs[0].run_id);
           setBaselineRunDetail(runDetail);
         }
@@ -158,6 +158,9 @@ export default function WhatIfSimulator() {
     
     const payloadChanges = changes.map(({id, ...c}) => {
       const formatted = { ...c };
+      if (formatted.resource_id) formatted.resource_id = Number(formatted.resource_id);
+      if (formatted.task_id) formatted.task_id = Number(formatted.task_id);
+      if (formatted.type === "priority_change" && !formatted.priority) formatted.priority = "medium";
       if (formatted.type === "task_duration_change") {
         let mins = parseFloat(formatted.duration_value);
         if (formatted.duration_unit === "hours") mins *= 60;
@@ -197,6 +200,9 @@ export default function WhatIfSimulator() {
           name: s.name,
           changes: s.changes.map(({id, ...c}) => {
             const formatted = { ...c };
+      if (formatted.resource_id) formatted.resource_id = Number(formatted.resource_id);
+      if (formatted.task_id) formatted.task_id = Number(formatted.task_id);
+      if (formatted.type === "priority_change" && !formatted.priority) formatted.priority = "medium";
             if (formatted.type === "task_duration_change") {
               let mins = parseFloat(formatted.duration_value);
               if (formatted.duration_unit === "hours") mins *= 60;
@@ -392,18 +398,18 @@ export default function WhatIfSimulator() {
                         </tr>
                         <tr>
                           <td>Completion</td>
-                          <td>{baselineRunDetail?.makespan ? new Date(baselineRunDetail.makespan).toLocaleTimeString() : 'N/A'}</td>
-                          <td>{simulationResult.scenario.makespan ? new Date(simulationResult.scenario.makespan).toLocaleTimeString() : 'N/A'}</td>
+                          <td>{baselineRunDetail?.makespan_minutes != null ? `${baselineRunDetail.makespan_minutes} min` : 'N/A'}</td>
+                          <td>{simulationResult.scenario.makespan_minutes != null ? `${simulationResult.scenario.makespan_minutes} min` : 'N/A'}</td>
                         </tr>
                         <tr>
                           <td>Health</td>
-                          <td>{baselineAnalysis?.health?.score || 'N/A'}</td>
-                          <td>{simulationResult.scenario.health?.score || 'N/A'}</td>
+                          <td>{baselineAnalysis?.health?.score ?? 'N/A'}</td>
+                          <td>{simulationResult.scenario.health_score ?? 'N/A'}</td>
                         </tr>
                         <tr>
                           <td>Violations</td>
-                          <td>{baselineAnalysis?.issues?.length || 0}</td>
-                          <td>{simulationResult.scenario.issues?.length || 0}</td>
+                          <td>{simulationResult.baseline.deadline_violations}</td>
+                          <td>{simulationResult.scenario.deadline_violations}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -411,26 +417,26 @@ export default function WhatIfSimulator() {
                   
                   <div className="impact-details">
                     <p><strong>Makespan:</strong> {simulationResult.impact.makespan_change_minutes > 0 ? '+' : ''}{simulationResult.impact.makespan_change_minutes} minutes</p>
-                    <p><strong>Health:</strong> {simulationResult.impact.health_score_change > 0 ? '+' : ''}{simulationResult.impact.health_score_change}</p>
-                    <p><strong>New Issues:</strong> {simulationResult.impact.new_issues_count}</p>
-                    <p><strong>Resolved Issues:</strong> {simulationResult.impact.resolved_issues_count}</p>
+                    <p><strong>Health:</strong> {simulationResult.impact.health_change > 0 ? '+' : ''}{simulationResult.impact.health_change}</p>
+                    <p><strong>New Issues:</strong> {simulationResult.impact.new_issues.length}</p>
+                    <p><strong>Resolved Issues:</strong> {simulationResult.impact.resolved_issues.length}</p>
                   </div>
                 </div>
                 
                 <div className="scenario-schedule">
                   <h3>Scenario Schedule</h3>
                   {simulationResult.scenario.status?.toUpperCase() === 'INFEASIBLE' ? (
-                    <InfeasibleView issues={simulationResult.scenario.issues || []} recoveryOptions={simulationResult.scenario.recovery_options || []} />
+                    <InfeasibleView issues={simulationResult.impact.new_issues} recoveryOptions={simulationResult.scenario.recovery_options || []} />
                   ) : (
                     <>
-                      <StatusHeader status={simulationResult.scenario.status?.toUpperCase()} health={simulationResult.scenario.health} solverRuns={[]} />
+                      <StatusHeader status={simulationResult.scenario.status?.toUpperCase()} health={{ score: simulationResult.scenario.health_score }} solverRuns={[]} />
                       <div className="results-grid">
                         <div className="results-main">
-                          <GanttChart planId={planId} runDetail={simulationResult.scenario} />
+                          <GanttChart planId={planId} runDetail={{ result: { schedule: simulationResult.schedule } }} />
                         </div>
                         <aside className="results-sidebar">
-                          {simulationResult.scenario.health && <PlanHealth health={simulationResult.scenario.health} />}
-                          <RisksAndBottlenecks risks={simulationResult.scenario.risks || []} bottlenecks={simulationResult.scenario.bottlenecks || []} />
+                          <p>Scenario health: {simulationResult.scenario.health_score} / 100</p>
+                          <p>Deadline violations: {simulationResult.scenario.deadline_violations}</p>
                         </aside>
                       </div>
                     </>
@@ -444,8 +450,8 @@ export default function WhatIfSimulator() {
                 {baselineAnalysis && (
                   <div className="baseline-metrics">
                     <p>Status: <strong>{baselineAnalysis.status}</strong></p>
-                    <p>Completion: <strong>{baselineRunDetail?.makespan ? new Date(baselineRunDetail.makespan).toLocaleTimeString() : 'N/A'}</strong></p>
-                    <p>Health: <strong>{baselineAnalysis.health?.score || 'N/A'} / 100</strong></p>
+                    <p>Completion: <strong>{baselineRunDetail?.makespan_minutes != null ? `${baselineRunDetail.makespan_minutes} min` : 'N/A'}</strong></p>
+                    <p>Health: <strong>{baselineAnalysis.health?.score ?? 'N/A'} / 100</strong></p>
                     <p>Issues: <strong>{baselineAnalysis.issues?.length || 0}</strong></p>
                   </div>
                 )}
@@ -494,18 +500,18 @@ export default function WhatIfSimulator() {
                     </tr>
                     <tr>
                       <td>Makespan</td>
-                      <td>{comparisonResult.baseline.makespan_minutes || 'N/A'} min</td>
-                      {comparisonResult.scenarios.map((s, i) => <td key={i}>{s.makespan_minutes || 'N/A'} min</td>)}
+                      <td>{comparisonResult.baseline.makespan_minutes ?? 'N/A'} min</td>
+                      {comparisonResult.scenarios.map((s, i) => <td key={i}>{s.makespan_minutes ?? 'N/A'} min</td>)}
                     </tr>
                     <tr>
                       <td>Health</td>
-                      <td>{comparisonResult.baseline.health?.score || 'N/A'}</td>
-                      {comparisonResult.scenarios.map((s, i) => <td key={i}>{s.health?.score || 'N/A'}</td>)}
+                      <td>{comparisonResult.baseline.health_score ?? 'N/A'}</td>
+                      {comparisonResult.scenarios.map((s, i) => <td key={i}>{s.health_score ?? 'N/A'}</td>)}
                     </tr>
                     <tr>
                       <td>Violations</td>
-                      <td>{comparisonResult.baseline.issues?.length || 0}</td>
-                      {comparisonResult.scenarios.map((s, i) => <td key={i}>{s.issues?.length || 0}</td>)}
+                      <td>{comparisonResult.baseline.deadline_violations}</td>
+                      {comparisonResult.scenarios.map((s, i) => <td key={i}>{s.deadline_violations}</td>)}
                     </tr>
                   </tbody>
                 </table>

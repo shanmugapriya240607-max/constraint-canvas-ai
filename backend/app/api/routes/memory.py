@@ -31,6 +31,12 @@ def create_memory(data: PlanningMemoryCreate, db: Session = Depends(get_db), cur
 def get_memories(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return memory_engine.get_memories(db, current_user)
 
+@router.get("/habits", response_model=List[HabitCandidateResponse])
+def get_habits(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from sqlalchemy import select
+    from app.models.memory import HabitCandidate
+    return db.scalars(select(HabitCandidate).where(HabitCandidate.user_id == current_user.id)).all()
+
 @router.get("/{memory_id}", response_model=PlanningMemoryResponse)
 def get_memory(memory_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return memory_engine.get_memory(db, current_user, memory_id)
@@ -48,12 +54,6 @@ def delete_memory(memory_id: int, db: Session = Depends(get_db), current_user: U
 def delete_all_memories(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     memory_engine.clear_all_memories(db, current_user)
     return {"detail": "All memories deleted"}
-
-@router.get("/habits", response_model=List[HabitCandidateResponse])
-def get_habits(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    from sqlalchemy import select
-    from app.models.memory import HabitCandidate
-    return db.scalars(select(HabitCandidate).where(HabitCandidate.user_id == current_user.id)).all()
 
 @router.post("/habits/detect", response_model=List[HabitCandidateResponse])
 def detect_habits(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

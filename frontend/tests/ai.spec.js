@@ -1,109 +1,44 @@
 import { test, expect } from "@playwright/test";
 
-const sessionKey = "constraintcanvas.session";
-
-test.beforeEach(async ({ page }) => {
-  // Prevent external network requests
-  await page.route("https://fonts.googleapis.com/**", (route) => route.abort());
-  await page.route("https://fonts.gstatic.com/**", (route) => route.abort());
-
-  // Setup generic API fallback
-  await page.route("**/api/**", async (route) => {
-    // We'll define specific endpoints after this
-    await route.fallback();
+test("AI builder uses the backend preview and explicit confirmation contracts", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("constraintcanvas.session", JSON.stringify({ token: "test-token", expiresAt: Date.now() + 60000 })));
+  await page.route("**/api/auth/me", route => route.fulfill({ json: { id: 1, name: "Test User", email: "test@example.com" } }));
+  await page.route("**/api/plans/42/context", route => route.fulfill({ json: { plan_id: 42, memory_enabled: false, relevant_context: [], requires_confirmation: true } }));
+  const draft = {
+    plan: { name: "Release", description: null, planning_start: null, planning_end: "2026-09-18T18:00:00Z" },
+    tasks: [{ client_id: "dev", name: "Development", duration_value: "3", duration_unit: "hours", priority: "medium", earliest_start: null, deadline: null, deadline_text: null },
+      { client_id: "test", name: "Testing", duration_value: "90", duration_unit: "minutes", priority: "critical", earliest_start: null, deadline: "2026-09-18T17:00:00Z", deadline_text: "5 PM" }],
+    resources: [{ client_id: "ravi", name: "Ravi", resource_type: "developer", capacity: 1, availability: [] }],
+    dependencies: [{ before_task_id: "dev", after_task_id: "test" }],
+    requirements: [{ task_id: "test", resource_type: "developer", quantity: 1, required_resource_id: "ravi" }],
+    constraints: [], custom_fields: [], custom_values: {}, evidence: [], ambiguities: [],
+    missing_information: [{ field: "plan.planning_start", reason: "Missing start" }],
+  };
+  let confirmed = false;
+  await page.route("**/api/ai/parse-plan", async route => {
+    expect(route.request().postDataJSON()).toEqual({ text: "Development takes 3 hours. Testing takes 90 minutes after Development." });
+    await route.fulfill({ json: { status: "needs_clarification", draft, questions: [{ id: "q1", field: "plan.planning_start", reason: "Missing start", question: "Please confirm planning start", allowed_answers: [] }], errors: [], requires_confirmation: true } });
   });
-
-  // Setup auth session
-  await page.addInitScript(
-    ({ key }) =>
-      sessionStorage.setItem(
-        key,
-        JSON.stringify({ token: "test-token", expiresAt: Date.now() + 60000 }),
-      ),
-    { key: sessionKey },
-  );
-
-  await page.route("**/api/auth/me", async (route) => {
-    await route.fulfill({ status: 200, json: { id: 1, name: "Test User", email: "test@example.com" } });
+  await page.route("**/api/ai/confirm-plan", async route => {
+    const body = route.request().postDataJSON();
+    expect(Object.keys(body).sort()).toEqual(["answers", "confirmed", "draft"]);
+    expect(body.confirmed).toBe(true);
+    expect(body.draft.tasks[1].priority).toBe("critical");
+    expect(body.draft.plan.planning_start).toBe("2026-09-18T09:00:00Z");
+    expect(body.answers).toContainEqual({field: "plan.planning_start", value: "2026-09-18T09:00:00Z"});
+    confirmed = true;
+    await route.fulfill({ status: 201, json: { status: "created", plan_id: 42, created_counts: {tasks: 2, resources: 1} } });
   });
-
-  await page.route("**/api/memory/consent", async (route) => {
-    await route.fulfill({ status: 200, json: { enabled: true } });
-  });
-
-  await page.route("**/api/memory", async (route) => {
-    await route.fulfill({ status: 200, json: [{ id: 1, key: "Preferred Tester", value: "Ravi" }] });
-  });
-
-  await page.route("**/api/ai/parse-plan", async (route) => {
-    await new Promise(r => setTimeout(r, 500)); // Simulate delay
-    const parsedData = {
-      tasks: [{ name: "Development", duration: "3 hours", priority: "Medium" }, { name: "Testing", duration: "90 minutes", priority: "Critical", deadline: "5:00 PM" }],
-      resources: [{ name: "Developer", capacity: "3" }, { name: "Ravi", type: "Tester", capacity: "1" }],
-      dependencies: [{ from: "Development", to: "Testing" }],
-      missing_information: [{ field: "start_time", question: "What is the planning start time?", provided_answer: "" }],
-      custom_fields: [{ key: "budget", label: "Estimated Budget", type: "number", value: "" }]
-    };
-    await route.fulfill({ status: 200, json: parsedData });
-  });
-
-  await page.route("**/api/ai/confirm-plan", async (route) => {
-    await route.fulfill({ status: 200, json: { id: 42, success: true } });
-  });
-
-  await page.route("**/api/plans/*/results", async (route) => {
-    await route.fulfill({ status: 200, json: { gantt_chart: null } });
-  });
-});
-
-test("AI Plan Builder parses natural language, allows review, and confirms", async ({ page }) => {
-  page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
-  page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
-
   await page.goto("/plans/ai-create");
-
-  // Check initial state
-  await expect(page.getByRole("heading", { name: "AI Plan Builder" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Analyze Requirements" })).toBeDisabled();
-
-  // Enter text
-  await page.getByPlaceholder("We have 3 developers.").fill("We have 3 developers. Development takes 3 hours. Testing takes 90 minutes. Ravi does Testing before 5 PM.");
-  
-  // Submit
-  await page.getByRole("button", { name: "Analyze Requirements" }).click();
-
-  // Check parsing state
-  await expect(page.getByText("Understanding your requirements...")).toBeVisible();
-
-  // Check review state after loading
-  await expect(page.getByText("Review the extracted details below.")).toBeVisible();
-
-  // Check extracted values
-  await expect(page.getByRole("heading", { name: "Needs Confirmation" })).toBeVisible();
-  await expect(page.getByLabel("What is the planning start time?")).toBeVisible();
-  
-  // Verify resources and tasks rendered
-  // Verify resources and tasks rendered
-  const inputs = page.locator('input.form-control');
-  await expect(inputs.filter({ hasWebString: 'Development' })).toBeDefined; // Hack just to not fail on strictness, we just want to ensure it works
-  
-  // Or simply rely on the form being rendered. Let's just edit the missing info field.
-  
-  // Check memory integration
-  await expect(page.getByText("Relevant saved planning context is available.")).toBeVisible();
-  await page.getByRole("button", { name: "Review Context & Apply" }).click();
-  await expect(page.getByText("Saved planning context applied!")).toBeVisible();
-
-  // Edit an extracted value
-  await page.getByLabel("What is the planning start time?").fill("9:00 AM");
-  
-  // Confirm Plan
-  await page.getByRole("button", { name: "Confirm & Create Plan" }).click({ force: true });
-
-  // Check confirmed state
-  await expect(page.getByRole("heading", { name: "Plan created successfully" })).toBeVisible();
-  
-  // Navigate to optimization
-  await page.getByRole("button", { name: "Optimize Plan" }).click();
-  await expect(page).toHaveURL(/\/plans\/42\/results/);
+  await page.getByLabel("Describe your planning problem in plain English").fill("Development takes 3 hours. Testing takes 90 minutes after Development.");
+  await page.getByRole("button", {name: "Analyze Requirements"}).click();
+  await expect(page.getByRole("heading", {name: "Needs Confirmation"})).toBeVisible();
+  await expect(page.getByLabel("Task 1 name")).toHaveValue("Development");
+  await expect(page.getByLabel("Task 1 duration", {exact: true})).toHaveValue("3");
+  await expect(page.getByText("Specific resource: Ravi")).toBeVisible();
+  expect(confirmed).toBe(false);
+  await page.getByLabel("Plan planning start").fill("2026-09-18T09:00:00Z");
+  await page.getByRole("button", {name: "Confirm & Create Plan"}).click();
+  await expect(page.getByRole("heading", {name: "Plan created successfully"})).toBeVisible();
+  expect(confirmed).toBe(true);
 });

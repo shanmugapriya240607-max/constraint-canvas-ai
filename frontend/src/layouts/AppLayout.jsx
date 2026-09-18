@@ -7,6 +7,7 @@ import Icon from "../components/Icon";
 const navigation = [
   ["/dashboard", "Dashboard", "grid"],
   ["/plans/new", "New Plan", "plus"],
+  ["/plans/ai-create", "AI Plan Builder", "pulse"],
   ["/plans", "Planning History", "history"],
   ["/what-if", "What-If Simulator", "branch"],
   ["/memory", "Memory", "memory"],

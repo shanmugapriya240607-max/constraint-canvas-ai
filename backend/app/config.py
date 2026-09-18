@@ -2,6 +2,8 @@
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
+from ipaddress import ip_address
+from sqlalchemy.engine import make_url
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -47,6 +49,34 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET_KEY must contain at least 32 bytes")
         elif self.app_env == "production":
             raise ValueError("JWT_SECRET_KEY is required in production")
+        return self
+
+    @model_validator(mode="after")
+    def production_configuration(self) -> "Settings":
+        if self.app_env != "production":
+            return self
+        if not self.frontend_origins:
+            raise ValueError("FRONTEND_ORIGINS requires the public HTTPS frontend origin in production")
+        for origin in self.frontend_origins:
+            parsed = urlsplit(origin)
+            hostname = parsed.hostname.lower()
+            try:
+                local = not ip_address(hostname).is_global
+            except ValueError:
+                local = hostname == "localhost" or hostname.endswith(".localhost")
+            if parsed.scheme != "https" or local:
+                raise ValueError("Production FRONTEND_ORIGINS must use public HTTPS origins")
+        if "database_url" not in self.model_fields_set:
+            raise ValueError("DATABASE_URL must be explicitly configured on persistent storage in production")
+        try:
+            url = make_url(self.database_url)
+        except Exception:
+            raise ValueError("DATABASE_URL is invalid") from None
+        if url.get_backend_name() == "sqlite":
+            if (not url.database or url.database == ":memory:"
+                    or not Path(url.database).is_absolute()
+                    or url.query.get("mode") == "memory"):
+                raise ValueError("Production SQLite requires an absolute file path on persistent storage")
         return self
 
     @field_validator("frontend_origins", mode="before")

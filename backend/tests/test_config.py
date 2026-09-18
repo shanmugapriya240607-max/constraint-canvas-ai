@@ -67,12 +67,14 @@ def test_jwt_algorithm_is_allowlisted():
         Settings(_env_file=None, jwt_algorithm="none")
 
 
-def test_environment_jwt_configuration(monkeypatch):
+def test_environment_jwt_configuration(monkeypatch, tmp_path):
     import secrets
     from app.services.security import TokenService
 
     secret = secrets.token_urlsafe(48)
     monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("FRONTEND_ORIGINS", "https://frontend.example.com")
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{(tmp_path / 'production.db').as_posix()}")
     monkeypatch.setenv("JWT_SECRET_KEY", secret)
     monkeypatch.setenv("JWT_ALGORITHM", "HS256")
     monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")

@@ -38,3 +38,11 @@ backend/data/*.sqlite3
 Thumbs.db
 .vscode/
 .idea/
+
+# Environment variants and local host metadata
+.env.*
+!.env.example
+.vercel/
+*.db-*
+*.sqlite-*
+*.sqlite3-*

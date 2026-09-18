@@ -5,6 +5,8 @@ from sqlalchemy import select
 from app.dependencies.ownership import Database, OwnedPlan, PathID, WritablePlan, get_nested
 from app.models import SolverRun
 from app.schemas.solver import SolveRequest, SolveResponse, SolverRunDetail, SolverRunSummary
+from app.schemas.explanation import PlanExplanation
+from app.services.explanation import explain_latest_run
 from app.services.solver.input_builder import SolverInputError
 from app.services.solver.service import solve_plan
 
@@ -27,3 +29,8 @@ def list_runs(plan: OwnedPlan,db: Database):
 @router.get("/{plan_id}/runs/{run_id}",response_model=SolverRunDetail)
 def read_run(run_id: PathID,plan: OwnedPlan,db: Database):
     return get_nested(db,SolverRun,run_id,plan_id=plan.id)
+
+
+@router.get("/{plan_id}/explanation", response_model=PlanExplanation)
+def explain_plan(plan: OwnedPlan, db: Database):
+    return explain_latest_run(db, plan)

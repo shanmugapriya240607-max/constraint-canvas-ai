@@ -185,3 +185,7 @@ export async function getResources(planId) {
 export async function getTasks(planId) {
   return api(`/api/plans/${planId}/tasks`, { method: "GET" });
 }
+
+export async function getPlanExplanation(planId) {
+  return api(`/api/plans/${planId}/explanation`, { method: "GET" });
+}

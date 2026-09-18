@@ -1563,3 +1563,11 @@ h3 {
   padding-top: 1rem;
   border-top: 1px dashed var(--border-color);
 }
+
+/* Keep task bars reachable in the narrow Results column. */
+.results-main { min-width: 0; }
+@media (max-width: 600px) {
+  .gantt-wrapper { min-width: 0; }
+  .gantt-labels-header, .gantt-label { width: 90px; }
+  .gantt-track, .gantt-timeline-header { min-width: 0; }
+}

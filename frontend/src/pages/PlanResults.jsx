@@ -106,7 +106,7 @@ export default function PlanResults() {
           {isInfeasible ? (
             <InfeasibleView issues={issues} recoveryOptions={recovery_options} />
           ) : (
-            <GanttChart planId={planId} runDetail={latestRunDetail} />
+            <GanttChart planId={planId} runDetail={latestRunDetail} showExplanation />
           )}
         </div>
         

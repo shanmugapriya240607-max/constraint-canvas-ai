@@ -1,6 +1,29 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
-export default function GanttChart({ planId, runDetail }) {
+import { getPlanExplanation } from "../../services/planner";
+
+function TaskReasons({ planId, runId, taskId }) {
+  const [state, setState] = useState({ loading: true });
+  useEffect(() => {
+    let active = true;
+    getPlanExplanation(planId).then(
+      data => { if (active) setState({ data }); },
+      error => { if (active) setState({ error: error.message }); },
+    );
+    return () => { active = false; };
+  }, [planId, runId]);
+
+  if (state.loading) return <p role="status">Loading schedule explanation...</p>;
+  if (state.error) return <p role="alert">Could not load the schedule explanation: {state.error}</p>;
+  // This endpoint describes the latest saved run, never an unsaved scenario or an older run.
+  const matchesRun = state.data?.run_id === runId && state.data?.plan_id === Number(planId);
+  const reasons = matchesRun && ["optimal", "feasible"].includes(state.data.status)
+    ? state.data.tasks?.find(task => task.task_id === taskId)?.reasons : null;
+  if (!reasons?.length) return <p>No explanation is available for this task in the displayed schedule.</p>;
+  return <ul>{reasons.map((reason, index) => <li key={index} data-reason-kind={reason.kind}>{reason.message}</li>)}</ul>;
+}
+
+export default function GanttChart({ planId, runDetail, showExplanation = false }) {
   const [selectedTask, setSelectedTask] = useState(null);
 
   const schedule = useMemo(() => {
@@ -85,6 +108,12 @@ export default function GanttChart({ planId, runDetail }) {
                     <div
                       className={`gantt-bar ${getPriorityClass(task.priority)} ${isSelected ? 'selected' : ''}`}
                       style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Show details for ${task.task_name}`}
+                      onKeyDown={event => {
+                        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedTask(task); }
+                      }}
                       onClick={() => setSelectedTask(task)}
                     >
                       <span className="gantt-bar-label">{task.task_name}</span>
@@ -131,9 +160,9 @@ export default function GanttChart({ planId, runDetail }) {
             
             <div className="why-schedule-section">
               <h5>Why this schedule?</h5>
-              <p className="text-secondary text-sm">
-                Based on required resource availability and dependency constraints evaluated during optimization.
-              </p>
+              {showExplanation && runDetail?.id ? (
+                <TaskReasons key={`${planId}:${runDetail.id}`} planId={planId} runId={runDetail.id} taskId={selectedTask.task_id} />
+              ) : <p>No saved-run explanation is available for this schedule.</p>}
             </div>
           </div>
         </div>

@@ -1,15 +1,15 @@
 import json
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 from fastapi import HTTPException
 from app.models.db_models import User
 from app.models.memory import PlanningMemory, HabitCandidate
 from app.schemas.memory import (
     MemoryConsentUpdate, PlanningMemoryCreate, PlanningMemoryUpdate,
-    ContextRouterResponse, ContextRelevantMemory, ContextApplyRequest
+    ContextRouterResponse, ContextRelevantMemory, ContextApplyRequest, ContextApplyResponse
 )
-from app.models.planning import Plan
+from app.models.planning import Plan, ConstraintRule, utcnow
 from app.schemas.planning import FullPlanResponse
 from app.services.planning import full_plan
 
@@ -221,38 +221,69 @@ def route_context(db: Session, plan_id: int, user: User) -> ContextRouterRespons
         requires_confirmation=True
     )
 
-def apply_context(db: Session, plan_id: int, user: User, request: ContextApplyRequest) -> FullPlanResponse:
-    require_memory_enabled(user)
-    
-    plan = db.scalar(select(Plan).where(Plan.id == plan_id, Plan.user_id == user.id))
-    if not plan:
+def _context_preference(memory, snapshot):
+    """Resolve an explicit preference within this plan, without interpreting prose."""
+    if memory.memory_type != "preferred_resource":
+        raise HTTPException(status_code=422, detail="Selected context has no supported planning rule. Only structured preferred_resource context can be applied.")
+    value = memory.value_json
+
+    def resolve(items, kind):
+        entity_id, name = value.get(f"{kind}_id"), value.get(f"{kind}_name")
+        matches = [item for item in items
+                   if (entity_id is not None or name is not None)
+                   and (entity_id is None or (type(entity_id) is int and item.id == entity_id))
+                   and (name is None or (isinstance(name, str) and item.name.casefold() == name.casefold()))]
+        if len(matches) != 1:
+            raise HTTPException(status_code=422, detail=f"Selected context must identify one {kind} in this plan.")
+        return matches[0].id
+
+    return {"task_id": resolve(snapshot.tasks, "task"),
+            "resource_id": resolve(snapshot.resources, "resource")}
+
+
+def apply_context(db: Session, plan_id: int, user: User, request: ContextApplyRequest) -> ContextApplyResponse:
+    # Serialize applies with other plan writes before checking for existing rules.
+    locked = db.execute(update(Plan).where(Plan.id == plan_id, Plan.user_id == user.id)
+                        .values(updated_at=Plan.updated_at))
+    if locked.rowcount != 1:
         raise HTTPException(status_code=404, detail="Plan not found")
-        
+    db.refresh(user)
+    require_memory_enabled(user)
+    plan = db.get(Plan, plan_id)
+    db.refresh(plan)
     snapshot = full_plan(db, plan)
-    
-    # We do NOT permanently mutate the DB plan. We return a modified snapshot instead.
+    selected = sorted(set(request.memory_ids))
     memories = db.scalars(select(PlanningMemory).where(
-        PlanningMemory.user_id == user.id,
-        PlanningMemory.id.in_(request.memory_ids)
-    )).all()
-    
-    # Example logic: add temporary constraints based on memories.
-    # In a real app we'd map "preferred_resource" to new constraints in `snapshot.constraints`
-    # For now, just attach memory tags as a proof of concept or do a deep copy like what-if.
-    
-    # Since we are returning a FullPlanResponse, we can just deep-copy the snapshot.
-    s = snapshot.model_copy(deep=True)
-    
-    for mem in memories:
-        if mem.memory_type == "preferred_resource":
-            # Find task and resource
-            t_name = mem.value_json.get("task_name")
-            r_id = mem.value_json.get("resource_id")
-            # If we had logic to inject a new constraint here:
-            if t_name and r_id:
-                t = next((x for x in s.tasks if x.name == t_name), None)
-                if t:
-                    # just to show it was applied, maybe add to description
-                    t.description = f"{t.description or ''} [Applied memory: {mem.key}]"
-                    
-    return s
+        PlanningMemory.user_id == user.id, PlanningMemory.id.in_(selected)
+    ).order_by(PlanningMemory.id)).all()
+    if len(memories) != len(selected):
+        raise HTTPException(status_code=404, detail="Selected memory not found")
+    if any(not memory.active or not memory.confirmed for memory in memories):
+        raise HTTPException(status_code=409, detail="Selected context must be active and approved.")
+    # Validate the entire selection before any insertion: failure applies nothing.
+    parameters = [_context_preference(memory, snapshot) for memory in memories]
+    rules = list(db.scalars(select(ConstraintRule).where(ConstraintRule.plan_id == plan_id)
+                            .order_by(ConstraintRule.id)))
+    created, reused = [], []
+    for params in parameters:
+        existing = next((rule for rule in rules if rule.enabled
+                         and rule.constraint_type == "preferred_resource"
+                         and rule.hardness == "soft" and rule.parameters == params), None)
+        if existing is not None:
+            if existing not in reused:
+                reused.append(existing)
+            continue
+        rule = ConstraintRule(plan_id=plan_id, constraint_type="preferred_resource",
+                              hardness="soft", weight=1.0, parameters=params,
+                              source="memory", enabled=True)
+        db.add(rule)
+        rules.append(rule)
+        created.append(rule)
+    if created:
+        plan.updated_at = utcnow()
+    db.commit()
+    return ContextApplyResponse(
+        **full_plan(db, plan).model_dump(), status="updated" if created else "unchanged",
+        applied_memory_ids=selected, created_constraint_ids=[rule.id for rule in created],
+        reused_constraint_ids=[rule.id for rule in reused if rule not in created],
+    )

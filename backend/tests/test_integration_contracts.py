@@ -80,4 +80,5 @@ def test_memory_habit_route_and_context_shapes(client, actors):
     assert context.json()["requires_confirmation"] is True
     assert context.json()["relevant_context"][0]["memory_id"] == memory.json()["id"]
     applied = client.post(base + "/context/apply", headers=owner, json={"memory_ids": [memory.json()["id"]]})
-    assert applied.status_code == 200 and "plan" in applied.json()
+    assert applied.status_code == 422  # Free-text hours cannot be turned into a rule implicitly.
+    assert client.get(base + "/full", headers=owner).json()["constraints"] == []

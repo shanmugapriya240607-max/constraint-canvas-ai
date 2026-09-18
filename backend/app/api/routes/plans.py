@@ -24,7 +24,7 @@ from app.services.analysis_engine import analyze_plan
 from app.schemas.whatif import (
     WhatIfRequest, WhatIfResponse, CompareScenariosRequest, ScenarioComparisonResponse
 )
-from app.schemas.memory import ContextRouterResponse, ContextApplyRequest
+from app.schemas.memory import ContextRouterResponse, ContextApplyRequest, ContextApplyResponse
 from app.services import memory_engine
 from app.services.whatif_engine import simulate_what_if, compare_scenarios
 
@@ -87,7 +87,7 @@ def get_plan_context(plan: OwnedPlan, current_user: CurrentUser, db: Database):
     return memory_engine.route_context(db, plan.id, current_user)
 
 
-@router.post("/{plan_id}/context/apply", response_model=FullPlanResponse)
+@router.post("/{plan_id}/context/apply", response_model=ContextApplyResponse)
 def apply_plan_context(request: ContextApplyRequest, plan: OwnedPlan, current_user: CurrentUser, db: Database):
     return memory_engine.apply_context(db, plan.id, current_user, request)
 

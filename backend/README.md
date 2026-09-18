@@ -595,3 +595,23 @@ non-finite values rejected). The result is validated with the unchanged
 `PlanningDraft` model before normal preview/semantic validation. Custom field
 inference is excluded from this transport; manual dynamic validation remains
 unchanged. Missing dates/timezones and named-resource capacities remain unknown.
+
+### Applying approved planning context
+
+`POST /api/plans/{plan_id}/context/apply` accepts `{"memory_ids": [1, 2]}`.
+Only selected, active, confirmed memories belonging to the authenticated plan
+owner are applied. Consent must be enabled; context retrieval never edits plans.
+
+Structured `preferred_resource` memories identify a task and resource using
+`task_id`/`task_name` and `resource_id`/`resource_name`. Names resolve within the
+owned plan, including name-based accepted habits. Application saves an enabled
+soft preference with weight 1 and source `memory`; it does not force an assignment
+or run the solver. Unsupported types, free text, and missing or conflicting
+references return 422 without applying any selection.
+
+The response retains the full-plan fields and adds `status` (`updated` or
+`unchanged`), `applied_memory_ids`, `created_constraint_ids`, and
+`reused_constraint_ids`. Equivalent enabled soft preferences are reused,
+including manual preferences. Repeated applies do not duplicate rules. The whole
+selection is validated and committed atomically under the plan write lock.
+An empty selection makes no changes. No database migration is required.

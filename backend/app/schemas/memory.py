@@ -1,6 +1,7 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict
+from app.schemas.planning import FullPlanResponse
 
 class MemoryConsentUpdate(BaseModel):
     enabled: bool
@@ -64,3 +65,10 @@ class ContextRouterResponse(BaseModel):
 
 class ContextApplyRequest(BaseModel):
     memory_ids: List[int]
+
+
+class ContextApplyResponse(FullPlanResponse):
+    status: Literal["updated", "unchanged"]
+    applied_memory_ids: list[int]
+    created_constraint_ids: list[int]
+    reused_constraint_ids: list[int]

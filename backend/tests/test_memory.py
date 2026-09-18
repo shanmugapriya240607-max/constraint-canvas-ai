@@ -185,7 +185,8 @@ def test_context_router_and_delete(client, auth_headers, base_plan, db_engine):
     # Apply
     app_resp = client.post(f"{base}/context/apply", json={"memory_ids": [mem_id]}, headers=auth_headers)
     assert app_resp.status_code == 200
-    assert "Applied memory: pref1" in app_resp.json()["tasks"][0]["description"]
+    assert app_resp.json()["status"] == "updated"
+    assert app_resp.json()["constraints"][0]["parameters"] == {"task_id": t1["id"], "resource_id": r1["id"]}
     
     # Disable memory disables context
     client.put("/api/memory/consent", json={"enabled": False}, headers=auth_headers)

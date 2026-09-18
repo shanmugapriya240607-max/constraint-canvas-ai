@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import Icon from "../components/Icon";
+import { getMemoryConsent, getHabitCandidates } from "../services/memory";
 
 const metrics = [
   ["Total Plans", "layers", "Your plans, in one place", "totalPlans"],
@@ -13,6 +15,24 @@ const metrics = [
 export default function Dashboard({ summary = null, loading = false }) {
   const { user } = useAuth();
   const firstName = user.name.trim().split(/\s+/)[0];
+
+  const [memoryEnabled, setMemoryEnabled] = useState(false);
+  const [habitCount, setHabitCount] = useState(0);
+
+  useEffect(() => {
+    async function loadMemory() {
+      try {
+        const c = await getMemoryConsent();
+        setMemoryEnabled(c.enabled);
+        const h = await getHabitCandidates();
+        setHabitCount(h.length || 0);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadMemory();
+  }, []);
+
   return (
     <>
       <div className="page-heading">
@@ -21,10 +41,16 @@ export default function Dashboard({ summary = null, loading = false }) {
           <h1>Welcome, {firstName}.</h1>
           <p>Here’s where your next great plan begins.</p>
         </div>
-        <Link className="button primary" to="/plans/new">
-          <Icon name="plus" size={18} />
-          Create New Plan
-        </Link>
+        <div style={{ display: "flex", gap: "1rem" }}>
+          <Link className="button secondary" to="/memory" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "0.5rem 1rem", height: "auto" }}>
+            <strong>Memory: {memoryEnabled ? "ON" : "OFF"}</strong>
+            <span style={{ fontSize: "0.8em", opacity: 0.8 }}>{habitCount > 0 ? `${habitCount} Pending Habits` : "No pending habits"}</span>
+          </Link>
+          <Link className="button primary" to="/plans/new">
+            <Icon name="plus" size={18} />
+            Create New Plan
+          </Link>
+        </div>
       </div>
       <section className="welcome-panel">
         <div>

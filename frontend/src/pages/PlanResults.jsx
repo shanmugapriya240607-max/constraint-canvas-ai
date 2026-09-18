@@ -7,6 +7,7 @@ import PlanHealth from "../components/results/PlanHealth";
 import RisksAndBottlenecks from "../components/results/RisksAndBottlenecks";
 import InfeasibleView from "../components/results/InfeasibleView";
 import SolverHistory from "../components/results/SolverHistory";
+import RelevantPlanningContext from "../components/planner/RelevantPlanningContext";
 
 export default function PlanResults() {
   const { planId } = useParams();
@@ -94,6 +95,11 @@ export default function PlanResults() {
       </header>
 
       <StatusHeader status={status} health={health} solverRuns={solverRuns} />
+
+      <RelevantPlanningContext 
+        planId={planId} 
+        onApplied={() => window.location.reload()} 
+      />
 
       <div className="results-grid">
         <div className="results-main">

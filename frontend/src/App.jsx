@@ -9,6 +9,8 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import AppLayout from "./layouts/AppLayout";
 import PlanResults from "./pages/PlanResults";
 import WhatIfSimulator from "./pages/WhatIfSimulator";
+import Memory from "./pages/Memory";
+import AiPlanBuilder from "./pages/AiPlanBuilder";
 
 export default function App() {
   const { pathname } = useLocation();
@@ -38,6 +40,10 @@ export default function App() {
             element={<CreatePlan />}
           />
           <Route
+            path="/plans/ai-create"
+            element={<AiPlanBuilder />}
+          />
+          <Route
             path="/plans/:planId/results"
             element={<PlanResults />}
           />
@@ -55,7 +61,7 @@ export default function App() {
           />
           <Route
             path="/memory"
-            element={<Placeholder title="Memory" icon="memory" />}
+            element={<Memory />}
           />
           <Route
             path="/settings"

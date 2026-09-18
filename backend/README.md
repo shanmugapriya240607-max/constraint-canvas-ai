@@ -411,13 +411,13 @@ class in `app/services/ai/gemini_client.py`. It inherits the same environment an
 backend/.env loading policy without changing shared settings or authentication.
 
 - `GEMINI_API_KEY`: optional secret. Missing/blank returns 503 only for parsing.
-- `GEMINI_MODEL`: defaults to `gemini-2.5-flash`; override for your account/model lifecycle.
+- `GEMINI_MODEL`: defaults to `gemini-3.6-flash`; override for your account/model lifecycle.
 - `GEMINI_TIMEOUT_SECONDS`: defaults to 30, bounded to 1–120 seconds.
 - Client: existing `httpx` dependency, Google's official structured JSON REST
-  generateContent API; no additional SDK or startup network call.
+  Interactions API; no additional SDK or startup network call.
 - Provider responses are bounded. No automatic retries, function calls, tools,
   code execution, schedules, or raw upstream error logging.
-- Documentation: [structured output](https://ai.google.dev/gemini-api/docs/generate-content/structured-output)
+- Documentation: [structured output](https://ai.google.dev/gemini-api/docs/structured-output)
   and [model catalog](https://ai.google.dev/gemini-api/docs/models).
 
 ### POST /api/ai/parse-plan
@@ -555,3 +555,43 @@ Run from backend with the existing virtual environment:
 ```
 Tests use fake provider extraction and httpx.MockTransport. They never call Gemini.
 Normal API tests use temporary databases. No frontend integration is included.
+### Live Gemini diagnostics
+
+Provider failures now record a bounded, redacted diagnostic in the
+`app.services.ai.gemini_client` logger: upstream HTTP status, configured model,
+failure category and sanitized provider message. API clients receive controlled
+messages only, never the upstream body. Configured credentials, token/key/password
+patterns, and the submitted planning text are redacted before logging. Raw bodies,
+headers and exception tracebacks are not logged by the adapter.
+
+HTTP 400 is identified as a rejected extraction configuration (API 502);
+HTTP 404 identifies an unavailable configured model (API 503). Authentication,
+rate limits, timeouts and network errors remain distinct. Connection timeout is
+at most ten seconds; the configured timeout controls other network operations.
+There are no automatic retries. Inspect the safe diagnostic before making another
+provider request, and use `GEMINI_MODEL` to select a model available to your account.
+
+The adapter posts once to `/v1beta/interactions` with configurable `model`,
+`input`, `system_instruction`, and `response_format` containing `type: text`,
+`mime_type: application/json`, and a shallow provider-only extraction JSON schema.
+`generation_config.max_output_tokens` is 16000; no sampling parameters are sent.
+`store: false` disables interaction storage. Only text from `model_output` steps
+of a `completed` interaction is accepted; thoughts, input echoes, unfinished
+responses and tool-only outputs cannot become a planning draft. There is no
+follow-up request or fallback API call. The existing Pydantic and semantic
+validation still run before returning a preview; only explicit confirmation can
+persist a plan. Parsing never invokes the optimizer.
+
+References: [Interactions API](https://ai.google.dev/api/interactions-api),
+[structured output](https://ai.google.dev/gemini-api/docs/structured-output), and
+[current response steps](https://ai.google.dev/gemini-api/docs/interactions-breaking-changes-may-2026).
+
+The provider schema lives in `app/services/ai/gemini_schema.py`. It has no
+`$defs`, `$ref`, defaults, titles, or nested union schemas. It covers plan facts,
+resources/availability, tasks, requirements, dependencies, constraints, missing
+information, ambiguities, and source evidence. Constraint parameters travel as
+`parameters_json` strings and are decoded with `json.loads` (duplicate keys and
+non-finite values rejected). The result is validated with the unchanged
+`PlanningDraft` model before normal preview/semantic validation. Custom field
+inference is excluded from this transport; manual dynamic validation remains
+unchanged. Missing dates/timezones and named-resource capacities remain unknown.

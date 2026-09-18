@@ -214,7 +214,7 @@ test("verified session restores after reload and logout clears it", async ({
   expect(
     meCalls.every((req) => req.authorization === "Bearer opaque-test-token"),
   ).toBe(true);
-  expect(requests.every((req) => req.path.startsWith("/api/auth/"))).toBe(true);
+  expect(requests.every((req) => req.path.startsWith("/api/auth/") || req.path.startsWith("/api/memory/"))).toBe(true);
   await page.screenshot({
     path: testInfo.outputPath("dashboard.png"),
     fullPage: true,

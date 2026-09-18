@@ -9,6 +9,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import AppLayout from "./layouts/AppLayout";
 import PlanResults from "./pages/PlanResults";
 import WhatIfSimulator from "./pages/WhatIfSimulator";
+import Memory from "./pages/Memory";
 
 export default function App() {
   const { pathname } = useLocation();
@@ -55,7 +56,7 @@ export default function App() {
           />
           <Route
             path="/memory"
-            element={<Placeholder title="Memory" icon="memory" />}
+            element={<Memory />}
           />
           <Route
             path="/settings"
